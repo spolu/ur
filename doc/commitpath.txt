@@ -1,0 +1,120 @@
+From: address expires 15 Apr 2009 David Mazieres <
+mazieres-cvhgnwkrcheq88ceh4wdrps9ni@temporary-address.scs.stanford.edu>
+Date: Thu, Jan 15, 2009 at 2:06 PM
+Subject: Git stuff
+To: Stanislas Polu <spolu@stanford.edu>, Ryan Stutsman <
+stutsman@cs.stanford.edu>, Steve Rumble <rumble@cs.stanford.edu>
+Cc: bkarp@cs.ucl.ac.uk, mwalfish@csail.mit.edu
+
+
+Hey, guys.  Here is the commitpath idea that I was talking to Brad Karp
+and Mike Walfish (CCed) about in London.
+
+Brad and Mike: I talked to Stan, Ryan, and Steve about this yesterday,
+and they seem potentially interested, though Steve is a big zfs fan and
+not yet convinced zfs isn't a better idea.  We are going to talk again
+next Wednesday.
+
+Stan is looking into seeing if there are some fuse tricks we can play to
+get almost instantaneous clones and pulls, by actually fetching the rest
+of the objects on demand and in the background.  The goal would be to
+make UR (or git++ or whatever we want to call it) replace many uses of
+network file systems, and the ability to switch machines is one aspect
+in which clearly we need very fast clones.
+
+David
+
+====
+
+Here's my latest idea for obviating git submodule.  We use Blob and
+Tree data structures that are basically like git.  However, we also
+introduce the generic notion of an object, which can be either a Blob
+or a Tree.
+
+   Blob = data
+   Tree = map:  name -> <metadata, Obj>
+   Obj = Tree | Blob
+
+Commits have slight differences from git:
+
+   Commit = metadata, Obj, CommitPath*
+
+First, a commit can reference any object (a tree or a blob).  Second,
+the parents of the Commit are a new object type called a CommitPath:
+
+   CommitPath = <Name, Commit, SubObj>
+
+Name and SubObj are both strings.  Any git utility that takes a commit
+as an argument can now instead take a CommitPath.  The CommitPath gets
+transformed into a commit or pseudo-commit for the utility to work on.
+
+Before explaining CommitPath, we need some notation.  Given a
+commitpath p, we use the symbol "=" to prepend components to Name and
+to append components to SubObj.  Any such components must start with a
+"/" character.  For example consider commitpath c1:
+
+   c1 = "/libasync", 0xf1a62...3, "/sfs1"
+
+Then:
+
+   /external=c1  MEANS  "/external/libasync", 0xf1a62...3, "/sfs1"
+   c1=/async  MEANS  "/libasync", 0xf1a62...3, "/sfs1/async"
+   /e=c1=/async  MEANS  "/e/libasync", 0xf1a62...3, "/sfs1/async"
+
+Consider a CommitPath c1 = <n, c, s>, where c = <m, t, p>.  We first
+create a pseudo-commit c' as follows.  If s is empty, then c' = c.
+Otherwise, if s is non-empty, then the Obj t in c must be a Tree
+containing an Obj named s (meaning s is a pathname in Tree t).  Let o
+designate the object names s in t.  We then let c'=<n, o, s>.
+
+Now we compute another pseudo-commit c'' as follows.  If n is empty,
+then c'' = c'.  Otherwise, we take the Obj o in c' and construct a
+tree t' such that o is named n in t'.  (In other words, we make an
+empty hierarchy of directories and place o at the bottom of it, so
+that o's name is n.)
+
+The git operation then operates on pseudo-commit c''.
+
+
+Now, some examples to see why this is good.  Suppose you want to
+incorporate your own version of libasync into a project.  Libasync is
+actually in my sfs1 directory under the name async, and you want to
+call it libasync.  Here's what you do:
+
+  git remote add sfs ssh://market.scs.stanford.edu/home/u1/dm/hack/sfs1.git
+  git fetch sfs /libasync=master=/async:refs/remotes/libasync/master
+  git merge sfs
+
+What does this do?  The first command just makes sfs an alias for the
+longer ssh://... string.  The second command fetches a bunch of stuff
+from my sfs repository and sticks it in a branch called
+refs/remotes/libasync/master.  But let's look at what exactly you are
+fetching...
+
+The /libasync= part means that whatever you are fetching from the
+repository, we'll pretend is in a directory called /libasync.  So
+basically just prepend /libasync to every pathname in the trees of my
+commits.  However, the =/async says that first you should strip /async
+off the pathnames in my trees, and in fact ignore everything that is
+not in the /async directory.
+
+Now let's say I want to pull changes back from you.  I do just the
+opposite:
+
+  git fetch your-repo /async=master=/libasync:whatever
+  git merge whatever
+
+Now all of your changes that do not already appear in my history will
+be merged into my tree, but all of these changes will only affect
+files whose names start with /async (and that are named
+/libasync/... in your tree).
+
+So the cool thing about this is that there is no automatically trying
+to figure out what objects correspond to what.  We do everything
+manually.  However, we still keep track of the history in terms of
+cross-repository commits.
+
+The downside is that I might want to change the name of a directory,
+and right now it's not clear how to deal with that, but it doesn't
+seem inherently impossible, so we can probably come up with something.
+
