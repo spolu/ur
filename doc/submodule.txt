@@ -28,7 +28,7 @@ tree::
 Each directory tracked by ur would have a .ur directory containing the
 objects and the history for that directory similar to the current .git
 structure but tracking only the history of the tree object and the
-associated blobs not the subdirectories.
+associated blobs but not the subdirectories.
 
 An entry 'name' -> branchname would mean that the directory points to
 the branch named branchname into the ur subdirectory 'name'
@@ -87,6 +87,24 @@ and
 We alleviate here the need for commitpath since the "suffix" is now
 implicitely stored in the ur directory hierarchy, while the "prefix"
 is stored in the remotes.
+
+In this model, the tree object does not map name to commit. In some
+sens Commit isn't necessary because you can "branch" a subdir and then
+refer to that branch with the intention of never changing the head. 
+
+From a user pesrpective it may be nice because users don't really have
+to understand commits so much. Basically there is only one idea: a
+branch which is a view with some common history.
+
+But in another sense referring to a commit instead of a branch is nice
+because when you commit a tree that refers to another commit you are
+explicitely stating that there is a dependence between the state of
+the parent and the state you specified of the child.
+
+A possible approach would be to keep the model as simple as possible,
+and eventually add support for commit by adopting later on the
+convention that a Commit is an acceptable branch name that is not
+meant to evolve.
 
 
 Branching:
@@ -153,7 +171,7 @@ Let consider the following workflow:
 ~spolu$ ur checkout master
 
 Here ~/pfs/ should not be visible in the file system. So what would be
-the meaning of the entry "'pfs' -> master" point in the 'pfs' branch ?
+the meaning of the entry "'pfs' -> master" in the 'pfs' branch ?
 How to perform 'ur checkout pfs'
 
 This can be solved in two way wether or not we use a local storage for objects
@@ -198,7 +216,7 @@ Commit:
 The commit command would see its semantic modified in the same way,
 That is, simple commit which update blobs history and branch pointers
 and recursive commit which would perform this action recursively,
-commiting in each ur subdirectories on the branch currently checkout.
+commiting in each ur subdirectories on the branch currently checked out.
 
 For each subdirectory a new commit object would be created if
 needed.
