@@ -1,0 +1,260 @@
+EXTENDING GIT SUBMODULE:
+------------------------
+
+It seems interesting to extend git submodules to support not only the
+current semantic: <remote, commit#> but also a more flexible semantic:
+
+<remote, branch>
+
+On top of that the use of commit pathes may allow to reconcile a
+repository and its submodules history in a more transparent fashion.
+
+
+DIRECTORIES AS SUBMODULES:
+--------------------------
+
+I think it's worth exploring the idea of pushing the extended git
+submodule further by representing any subdirectories as an extended
+submodule.
+
+This approach leads to one major advantage, the complete independence
+of the history of subdirectories across a directory tree.
+
+A directory would now be represented by a tree object:
+
+tree::
+  map 'name' -> branchname | blob
+  
+Each directory tracked by ur would have a .ur directory containing the
+objects and the history for that directory similar to the current .git
+structure but tracking only the history of the tree object and the
+associated blobs not the subdirectories.
+
+An entry 'name' -> branchname would mean that the directory points to
+the branch named branchname into the ur subdirectory 'name'
+represented by $CURDIR/name/.ur
+
+Both ur directories $CURDIR and $CURDIR/name (respectively $CURDIR/.ur
+and $CURDIR/name/.ur) would have their own remote set, but their existence
+locally permit to ommit the submodule remote information in the tree
+object.
+
+Example:
+
+     ~spolu/    -+-------> histar/
+     -> master   |            master
+      	 	 |         -> arm
+		 |
+		 +-------> waifs/     -+-------> doc/
+		 |	   -> master   |            master
+		 |       	       |         -> section2
+		 |		       |
+		 |		       +-------> src/
+		 |		       		    master
+		 |				 -> symlink
+		 |
+		 +-------> .profile			
+      
+in ~spolu/.ur, "master" would point to a COMMIT representing the
+following tree structure:
+
+  'histar'   -> 'arm'
+  'waifs'    -> 'master'
+  '.profile' -> SHA("~spolu/.profile")
+
+a .ur directory would exist in each of 
+  ~spolu/.ur
+  ~spolu/histar/.ur
+  ~spolu/waitfs/.ur
+  ~spolu/waitfs/doc/.ur
+  ~spolu/waitfs/src/.ur
+
+Each of this .ur directories would have their own set of remote.
+
+<~/spolu/waitfs> may have
+   market.scs.stanford.edu:~spolu/var/waitfs
+   
+while
+<~/spolu/waitfs/src> may have
+   market.scs.stanford.edu:~spolu/var/waitfs/src
+   market.scs.stanford.edu:~stutsman/src/waitfs
+
+and
+<~/spolu/waitfs/doc> may have
+   market.scs.stanford.edu:~spolu/var/waitfs/src
+   market.scs.stanford.edu:~dm/projects/waitfs
+
+We alleviate here the need for commitpath since the "suffix" is now
+implicitely stored in the ur directory hierarchy, while the "prefix"
+is stored in the remotes.
+
+
+Branching:
+----------
+
+This model introduces some weirdness in the branching concept due to
+the fact that the repository unit does not exists anymore.
+
+Most of these uncertainties boil down to the question, "what happens
+when I branch my home directory" ?
+
+Here two choices should be left to the user, to branch or to
+recursively branch:
+
+issuing a 'ur branch testshell' on ~spolu/ would result in the
+following tree:
+
+     ~spolu/      -+-------> histar/
+        master     |            master
+     -> testshell  |         -> arm
+		   |
+		   +-------> waifs/     -+-------> doc/
+		   |	   -> master   |            master
+		   |       	       |         -> section2
+		   |		       |
+		   |		       +-------> src/
+		   |		       		    master
+		   |				 -> symlink
+		   |
+		   +-------> .profile			
+
+while 'ur branch -R fusefix' on ~spolu/pfs/ would result in this tree:
+
+     ~spolu/    -+-------> histar/
+     -> master   |            master
+      	 	 |         -> arm
+		 |
+		 +-------> waifs/      -+-------> doc/
+		 |	      master    |            master
+		 |         -> fusefix   |            section2
+		 |	      		|	  -> fusefix
+		 |		        |
+		 |		        +-------> src/
+		 |		       	 	     master
+		 |				     symlink
+		 |				  -> fusefix
+		 |
+		 +-------> .profile			
+
+
+This mechanism seems general enough to yield interesting usage such
+as:
+
+~spolu$ ur branch pfsdev_fusefix
+~spolu$ cd pfs
+~spolu/pfs$ ur branch -R fusefix
+
+Here ~spolu/histar would still be the working directory of the arm
+branch.
+
+Let consider the following workflow:
+~spolu$ ur branch pfs
+~spolu$ ur clone market.scs.stanford.edu/~spolu/pfs
+~spolu$ ur checkout master
+
+Here ~/pfs/ should not be visible in the file system. So what would be
+the meaning of the entry "'pfs' -> master" point in the 'pfs' branch ?
+How to perform 'ur checkout pfs'
+
+This can be solved in two way wether or not we use a local storage for objects
+(such as /ur):
+
+- We can add information to the tree structure to be able to
+  reconstruct the .ur of pfs/ when we want to check out branch pfs
+  This means that objects would have to be stored in a local storage
+  and not in the .ur directories. But it also breaks the
+  "self-containability" of ur directories.
+
+- Hide the actual pfs/ directory inside ~spolu/.ur whenever we
+  checkout a branch that does not contain a reference to a
+  subdirectory that existed in the previous checkout. This method is
+  independent of wether we are using a local storage for object and
+  does maintain the fact that ur directories are totally self
+  contained and can be therefore moved around arbitrarly in the local
+  filesystem.
+
+Anyway this workflow might become interesting to provide views of
+someone's home directory as it would be the case if she connected to
+different NFS servers:
+
+~spolu$ ur branch pfs
+~spolu$ ur clone market.scs.stanford.edu/~spolu/pfs
+~spolu$ ur branch histar
+~spolu$ ur clone market.scs.stanford.edu/histar
+~spolu$ ls
+  .cshrc
+  Mail/
+  histar/
+~spolu$ ur checkout pfs
+~spolu$ ls
+  .cshrc
+  Mail/
+  pfs/
+
+
+Commit:
+-------
+
+The commit command would see its semantic modified in the same way,
+That is, simple commit which update blobs history and branch pointers
+and recursive commit which would perform this action recursively,
+commiting in each ur subdirectories on the branch currently checkout.
+
+For each subdirectory a new commit object would be created if
+needed.
+
+
+Merging:
+--------
+
+In this context a new type of conflict appears.
+
+Imagine principal A and B having the following state:
+
+A:
+waitfs/   -+--------> doc/
+-> master  |	         master
+   	   |          -> section2
+	   |
+	   +--------> src/
+	   	      -> master
+		      	 symlink		         
+
+B:
+waitfs/   -+--------> doc/
+-> master  |	      -> master
+   	   |             section2
+	   |
+	   +--------> src/
+	   	         master
+		      -> symlink		         
+
+
+Now if they both commit recursively on waitfs/ when A fetches B
+object, and attempt to merge, among other conflicts that can happen
+with traditional merges, there is a conflict on the branches
+doc/ and src/ are pointing to.
+
+This conflict should be stated to the user for him to decide which
+branch he wants to point to.
+
+It is unclear yet if this model should provide simple merge and
+recursive merge as well as simple fetch and recursive fetch.
+
+It seems intuitive that fetch/merge should be recursive by default.
+
+Rationale:
+----------
+
+This system makes tracking of history and sharing extremely flexible
+by removing the hard repository boundary.
+
+A directory tracked by ur could be moved around and even placed in an
+untracked directory without breaking the system.
+
+Nevertheless, the semantic would also be more flexible and could lead
+to weird workflows where branches could quickly become a real mess.
+
+I haven't differentiated local and remote branches here, and I think
+there is clearly some work to do on this too.
+
