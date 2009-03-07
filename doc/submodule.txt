@@ -22,9 +22,11 @@ of the history of subdirectories across a directory tree.
 
 A directory would now be represented by a tree object:
 
-tree::
-  map 'name' -> branchname | blob
+data Tree = Tree [(Name, Blob | Branch)]
   
+That is a tree is a list of name to (Blob | Branch) mapping. In this
+model, trees are never children of trees.
+
 Each directory tracked by ur would have a .ur directory containing the
 objects and the history for that directory similar to the current .git
 structure but tracking only the history of the tree object and the
