@@ -7,6 +7,7 @@
 #define UR_DIR_SHADOWS ".ur/shadows"
 #define UR_INDEX ".ur/index"
 #define UR_LOCK ".ur/lock"
+#define UR_HEAD ".ur/HEAD"
 
 #include <stdbool.h>
 #include "list.h"
