@@ -4,26 +4,42 @@
 #include "object.h"
 #include "list.h"
 
-#define ENTRY_TYPE_BITS 2;
-#define ENTRY_TYPE_BRANCH 0x1;
-#define ENTRY_TYPE_BLOB 0x2;
 
-struct tree_entry 
+struct blob_tree_entry 
 {
   const char *name;
-  unsigned type : ENTRY_TYPE_BITS;
-
-  const char *branch;
-  const blob *blob;
+  const char *commit;
 
   struct list_elem elem;  
 };
 
 
+struct branch_tree_entry
+{
+  const char *name;
+  const char *branch;
+  
+  struct list_elem elem;
+}
+
 struct tree 
 {
-  struct object object;
-  struct list entries;
+  struct list blob_entries;
+  struct list branch_entries;
 };
+
+
+
+/*
+ * Creates a new object for tree.
+ */
+int tree_objectify (struct tree *tree, unsigned char *sha1[20]);
+
+
+/*
+ * Reads tree from object
+ */
+int tree_read (struct tree *tree, unsigned char sha1[20]);
+
 
 #endif
