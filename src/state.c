@@ -13,7 +13,7 @@ state_check (const char *path)
 {
   int obj_fd = -1, fd = -1;
   char * head;
-
+  
   if (subdir_check (path, UR_DIR) != 0)
     goto error;
   
@@ -35,13 +35,32 @@ state_check (const char *path)
   if ((fd = file_open (path, UR_HEAD)) < 0)
     goto error;
 
+  char * head = readline (fd);
+  close (fd);
+
+  if (head == NULL)
+    goto error;
   
+  printf ("head found: %s\n", head);
+  free (head);
+
+  return 0;
 
  error:
   return -1;
 }
 
 
+int 
+state_init (const char *path)
+{
+  
+
+  return 0;
+
+ error:
+  return -1;
+}
 
 
 
