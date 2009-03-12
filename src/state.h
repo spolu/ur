@@ -9,7 +9,10 @@
 #define UR_LOCK ".ur/lock"
 #define UR_HEAD ".ur/HEAD"
 
+#define UR_MASTER "master"
+
 #include <stdbool.h>
+#include <time.h>
 #include "list.h"
 
 
