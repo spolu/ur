@@ -7,6 +7,7 @@
 int
 cmd_add (char *path, bool recursive)
 {
+  
   return 0;
 }
 
