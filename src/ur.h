@@ -1,5 +1,5 @@
-#ifndef _UR_STATE_H
-#define _UR_STATE_H
+#ifndef _UR_UR_H
+#define _UR_UR_H
 
 #define UR_DIR ".ur"
 #define UR_DIR_OBJECTS ".ur/objects"
@@ -44,6 +44,11 @@ struct state
  */
 extern struct state ur_state;
 
+
+/*
+ * initialize ur modules
+ */
+int init_ur ();
 
 /*
  * checks if the directory is tracked by looking a the .ur directory

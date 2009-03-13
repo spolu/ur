@@ -3,9 +3,18 @@
 #include <string.h>
 
 #include "tree.h"
-#include "state.h"
 #include "list.h"
 #include "io.h"
+
+struct tree TREE_INITIALIZER;
+
+int
+init_tree ()
+{
+  memset (&TREE_INITIALIZER, 0, sizeof (struct tree));
+  return 0;
+}
+
 
 int 
 tree_objectify (struct tree *tree, unsigned char sha1[20])
@@ -157,8 +166,12 @@ tree_read (struct tree *tree, unsigned char sha1[20])
 int 
 tree_init (struct tree *tree)
 {
+  tree->alive = false;
+  
   list_init (&tree->blob_entries);
   list_init (&tree->branch_entries);
+
+  tree->alive = true;
 
   return 0;
 }
@@ -166,27 +179,32 @@ tree_init (struct tree *tree)
 int 
 tree_destroy (struct tree *tree)
 {
-  while (list_size (&tree->blob_entries) > 0)
+  if (tree->alive)
     {
-      struct list_elem *e = list_front (&tree->blob_entries);
-      list_remove (e);
-      struct blob_tree_entry *en = list_entry (e, struct blob_tree_entry, elem);
-      free (en->name);
-      free (en->commit);
-      free (en);
+      
+      while (list_size (&tree->blob_entries) > 0)
+	{
+	  struct list_elem *e = list_front (&tree->blob_entries);
+	  list_remove (e);
+	  struct blob_tree_entry *en = list_entry (e, struct blob_tree_entry, elem);
+	  free (en->name);
+	  free (en->commit);
+	  free (en);
+	}
+      
+      
+      while (list_size (&tree->branch_entries) > 0)
+	{
+	  struct list_elem *e = list_front (&tree->branch_entries);
+	  list_remove (e);
+	  struct branch_tree_entry *en = list_entry (e, struct branch_tree_entry, elem);
+	  free (en->name);
+	  free (en->branch);
+	  free (en);
+	}
     }
 
-
-  while (list_size (&tree->branch_entries) > 0)
-    {
-      struct list_elem *e = list_front (&tree->branch_entries);
-      list_remove (e);
-      struct branch_tree_entry *en = list_entry (e, struct branch_tree_entry, elem);
-      free (en->name);
-      free (en->branch);
-      free (en);
-    }
-
+  tree->alive = false;
   return 0;
 }
 

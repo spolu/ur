@@ -1,6 +1,8 @@
 #ifndef _UR_TREE_H
 #define _UR_TREE_H
 
+#include <stdbool.h>
+
 #include "object.h"
 #include "list.h"
 
@@ -26,9 +28,17 @@ struct tree
 {
   struct list blob_entries;
   struct list branch_entries;
+
+  bool alive;
 };
 
 
+extern struct tree TREE_INITIALIZER;
+
+/*
+ *
+ */
+int init_tree ();
 
 /*
  * creates a new object for tree.

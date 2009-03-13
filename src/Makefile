@@ -3,7 +3,7 @@ CFLAGS = -Wall -g -std=gnu99
 LIBS = 
 MAKE = make
 
-UR_SRC = list.c io.c sha1.c state.c commit.c object.c tree.c
+UR_SRC = list.c io.c sha1.c ur.c commit.c object.c tree.c
 ur_obj = $(UR_SRC:.c=.o)
 
 

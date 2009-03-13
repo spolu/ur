@@ -8,6 +8,16 @@
 #include "io.h"
 #include "sha1.h"
 
+struct commit COMMIT_INITIALIZER;
+
+int 
+init_commit ()
+{
+  memset (&COMMIT_INITIALIZER, 0, sizeof (struct commit));
+  return 0;
+}
+
+
 int 
 commit_objectify (struct commit *commit, unsigned char sha1[20])
 {
@@ -115,6 +125,7 @@ int commit_create (struct commit *commit,
 		   const unsigned char object_sha1[20],
 		   const char *msg)
 {
+  commit->alive = false;
   commit->msg = NULL;
 
   memcpy (commit->parent_sha1_1, parent_sha1_1, 20);
@@ -135,7 +146,8 @@ int commit_create (struct commit *commit,
   
   strncpy (commit->msg, msg, strlen (msg));
 
-  commit->date = time (NULL);
+  commit->date = time (NULL);  
+  commit->alive = true;
 
   return 0;
 
@@ -149,10 +161,11 @@ int commit_create (struct commit *commit,
 int 
 commit_destroy (struct commit *commit)
 {
-  if (commit != NULL) {
+  if (commit->alive) {
     if (commit->msg != NULL)
       free (commit->msg);
   }
+  commit->alive = false;
   
   return 0;
 }

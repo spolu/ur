@@ -2,6 +2,7 @@
 #define _UR_COMMIT_H
 
 #include <time.h>
+#include <stdbool.h>
 
 #include "list.h"
 
@@ -21,9 +22,18 @@ struct commit
   unsigned char object_sha1[20];
   char *msg;
 
+  bool alive;
+
   struct list_elem elem;
 };
 
+
+extern struct commit COMMIT_INITIALIZER;
+
+/*
+ * initialize commit module
+ */
+int init_commit ();
 
 /*
  * creates a new object for commit

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "state.h"
+#include "ur.h"
 #include "object.h"
 #include "io.h"
 #include "commit.h"
@@ -13,6 +13,16 @@
 #include "tree.h"
 
 struct state ur_state;
+
+int
+init_ur ()
+{
+  init_commit ();
+  init_tree ();
+
+  return 0;
+}
+
 
 int 
 state_check (const char *path)
@@ -62,11 +72,12 @@ state_init (const char *path)
 {
   
   int fd = -1;
-  char * head;
+  char * head = NULL;
   unsigned char null_sha1[20];
-  struct commit initial_commit;
-  struct tree empty_tree;
+  struct commit initial_commit = COMMIT_INITIALIZER;
+  struct tree empty_tree = TREE_INITIALIZER;
   unsigned char sha1[20];
+  char buf[50];
 
   if (subdir_create (path, UR_DIR) != 0)
     goto error;
@@ -99,6 +110,7 @@ state_init (const char *path)
   writeline (fd, head, strlen (head), "\n");
   close (fd);
   free (head);
+  head = NULL;
 
   /*
    * used by commit_objectify
@@ -130,46 +142,28 @@ state_init (const char *path)
     goto error;
 
   commit_destroy (&initial_commit);
+  
+  head = (char *) malloc (strlen (UR_DIR_HEADS) + strlen (UR_MASTER) + 2);
+  sprintf (head, "%s/%s", UR_DIR_HEADS, UR_MASTER);  
 
-  // TODO : create master branch
-
-  /* objectify / read tests
-    struct commit commit2;
-    
-    if (commit_read (&commit2, sha1) != 0) {
-    printf ("commit read failed\n");
+  if ((fd = file_open (path, head, O_WRONLY | O_TRUNC | O_CREAT)) < 0)
     goto error;
-    }
-    
-    char buf[50];
-    sha1_to_hex (initial_commit.parent_sha1_1, buf);
-    printf ("%s", buf);
-    sha1_to_hex (commit2.parent_sha1_1, buf);
-    printf (" %s\n", buf);
-    
-    sha1_to_hex (initial_commit.parent_sha1_2, buf);
-    printf ("%s", buf);
-    sha1_to_hex (commit2.parent_sha1_2, buf);
-    printf (" %s\n", buf);
-    
-    sha1_to_hex (initial_commit.object_sha1, buf);
-    printf ("%s", buf);
-    sha1_to_hex (commit2.object_sha1, buf);
-    printf (" %s\n", buf);
-    
-    printf ("%d", initial_commit.object_type);
-    printf (" %d\n", commit2.object_type);
-    
-    printf ("%s", initial_commit.msg);
-    printf (" %s\n", commit2.msg);
-    
-    printf ("%d", initial_commit.date);
-    printf (" %d\n", commit2.date);    
-  */
+  fchmod (fd, S_IRUSR | S_IWUSR | S_IRGRP);
+
+  sha1_to_hex (sha1, buf);
+  writeline (fd, buf, 40, "\n");
+  close (fd);
+  free (head);
+  head = NULL;
 
   return 0;
 
  error:
+  if (head != NULL)
+    free (head);
+  commit_destroy (&initial_commit);
+  tree_destroy (&empty_tree);
+
   return -1;
 }
 
