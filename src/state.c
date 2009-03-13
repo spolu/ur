@@ -10,6 +10,7 @@
 #include "io.h"
 #include "commit.h"
 #include "sha1.h"
+#include "tree.h"
 
 struct state ur_state;
 
@@ -64,6 +65,7 @@ state_init (const char *path)
   char * head;
   unsigned char null_sha1[20];
   struct commit initial_commit;
+  struct tree empty_tree;
   unsigned char sha1[20];
 
   if (subdir_create (path, UR_DIR) != 0)
@@ -106,22 +108,30 @@ state_init (const char *path)
   ur_state.branch = NULL;
   ur_state.head = NULL;
 
-
   memset (null_sha1, 0, 20);
+
+  if (tree_init (&empty_tree) != 0)
+    goto error;
+
+  if (tree_objectify (&empty_tree, sha1) != 0)
+    goto error;  
+
+  tree_destroy (&empty_tree); //NOP
+
   if (commit_create (&initial_commit, 
 		     null_sha1, 
 		     null_sha1, 
 		     TREE_TYPE, 
-		     null_sha1, 
-		     "initial commit") != 0) {
-    printf ("commit_create failed\n");
+		     sha1, 
+		     "initial commit") != 0)
     goto error;
-  }
 
-  if (commit_objectify (&initial_commit, sha1) != 0) {
-    printf ("commit_objectify failed\n");
+  if (commit_objectify (&initial_commit, sha1) != 0)
     goto error;
-  }
+
+  commit_destroy (&initial_commit);
+
+  // TODO : create master branch
 
   /* objectify / read tests
     struct commit commit2;

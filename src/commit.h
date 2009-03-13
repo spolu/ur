@@ -45,6 +45,9 @@ int commit_create (struct commit *commit,
 		   const unsigned char object_sha1[20],
 		   const char *msg);
 		   
-
+/*
+ * destroy internall commit data
+ */
+int commit_destroy (struct commit *commit);
 
 #endif

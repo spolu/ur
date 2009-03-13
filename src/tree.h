@@ -7,8 +7,8 @@
 
 struct blob_tree_entry 
 {
-  const char *name;
-  const char *commit;
+  char *name;
+  char *commit;
 
   struct list_elem elem;  
 };
@@ -16,8 +16,8 @@ struct blob_tree_entry
 
 struct branch_tree_entry
 {
-  const char *name;
-  const char *branch;
+  char *name;
+  char *branch;
   
   struct list_elem elem;
 };
@@ -31,15 +31,44 @@ struct tree
 
 
 /*
- * Creates a new object for tree.
+ * creates a new object for tree.
  */
-int tree_objectify (struct tree *tree, unsigned char *sha1[20]);
+int tree_objectify (struct tree *tree, unsigned char sha1[20]);
 
 
 /*
- * Reads tree from object
+ * reads tree from object
  */
 int tree_read (struct tree *tree, unsigned char sha1[20]);
 
+
+/*
+ * initialize an empty tree
+ */
+int tree_init (struct tree *tree);
+
+
+/*
+ * destroy tree internal data
+ */
+int tree_destroy (struct tree *tree);
+
+/*
+ * add blob_tree_entry to tree. idempotent
+ * replace name if already existing
+ */
+int tree_blob_entry_add (struct tree *tree, char *name, char *commit);
+
+/*
+ * add branch_tree_entry to tree. idempotent.
+ * replace name if already existing
+ */
+int tree_branch_entry_add (struct tree *tree, char *name, char *branch);
+
+
+/*
+ * removes any entry associated with name
+ */
+int tree_remove_entry (struct tree *tree, char *name);
 
 #endif

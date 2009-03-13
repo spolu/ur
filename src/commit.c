@@ -146,3 +146,14 @@ int commit_create (struct commit *commit,
 }
 
 
+int 
+commit_destroy (struct commit *commit)
+{
+  if (commit != NULL) {
+    if (commit->msg != NULL)
+      free (commit->msg);
+  }
+  
+  return 0;
+}
+
