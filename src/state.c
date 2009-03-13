@@ -8,12 +8,10 @@
 #include "state.h"
 #include "object.h"
 #include "io.h"
+#include "commit.h"
+#include "sha1.h"
 
-static int subdir_check (const char *path, const char *dir);
-static int file_check (const char *root, const char *path);
-static int subdir_create (const char *root, const char *path);
-static int file_open (const char *root, const char *path, int oflag);
-
+struct state ur_state;
 
 int 
 state_check (const char *path)
@@ -64,7 +62,10 @@ state_init (const char *path)
   
   int fd = -1;
   char * head;
-  
+  unsigned char null_sha1[20];
+  struct commit initial_commit;
+  unsigned char sha1[20];
+
   if (subdir_create (path, UR_DIR) != 0)
     goto error;
   
@@ -72,6 +73,9 @@ state_init (const char *path)
     goto error;
 
   if (subdir_create (path, UR_DIR_SHADOWS) != 0)
+    goto error;
+
+  if (subdir_create (path, UR_DIR_OBJECTS) != 0)
     goto error;
 
   if ((fd = file_open (path, UR_INDEX, O_WRONLY | O_TRUNC | O_CREAT)) < 0)
@@ -94,6 +98,65 @@ state_init (const char *path)
   close (fd);
   free (head);
 
+  /*
+   * used by commit_objectify
+   */
+  ur_state.path = path;
+  ur_state.branches = NULL;
+  ur_state.branch = NULL;
+  ur_state.head = NULL;
+
+
+  memset (null_sha1, 0, 20);
+  if (commit_create (&initial_commit, 
+		     null_sha1, 
+		     null_sha1, 
+		     TREE_TYPE, 
+		     null_sha1, 
+		     "initial commit") != 0) {
+    printf ("commit_create failed\n");
+    goto error;
+  }
+
+  if (commit_objectify (&initial_commit, sha1) != 0) {
+    printf ("commit_objectify failed\n");
+    goto error;
+  }
+
+  /* objectify / read tests
+    struct commit commit2;
+    
+    if (commit_read (&commit2, sha1) != 0) {
+    printf ("commit read failed\n");
+    goto error;
+    }
+    
+    char buf[50];
+    sha1_to_hex (initial_commit.parent_sha1_1, buf);
+    printf ("%s", buf);
+    sha1_to_hex (commit2.parent_sha1_1, buf);
+    printf (" %s\n", buf);
+    
+    sha1_to_hex (initial_commit.parent_sha1_2, buf);
+    printf ("%s", buf);
+    sha1_to_hex (commit2.parent_sha1_2, buf);
+    printf (" %s\n", buf);
+    
+    sha1_to_hex (initial_commit.object_sha1, buf);
+    printf ("%s", buf);
+    sha1_to_hex (commit2.object_sha1, buf);
+    printf (" %s\n", buf);
+    
+    printf ("%d", initial_commit.object_type);
+    printf (" %d\n", commit2.object_type);
+    
+    printf ("%s", initial_commit.msg);
+    printf (" %s\n", commit2.msg);
+    
+    printf ("%d", initial_commit.date);
+    printf (" %d\n", commit2.date);    
+  */
+
   return 0;
 
  error:
@@ -102,7 +165,7 @@ state_init (const char *path)
 
 
 
-static int
+int
 subdir_check (const char *root, const char *path)
 {
   char * subdir = NULL;
@@ -137,7 +200,7 @@ subdir_check (const char *root, const char *path)
 }
 
 
-static int
+int
 file_check (const char *root, const char *path)
 {
   char * file = NULL;
@@ -175,7 +238,7 @@ file_check (const char *root, const char *path)
 }
 
 
-static int
+int
 file_open (const char *root, const char *path, int oflag)
 {
   char * file = NULL;
@@ -204,7 +267,7 @@ file_open (const char *root, const char *path, int oflag)
 }
 
 
-static int
+int
 subdir_create (const char *root, const char *path)
 {
   char * subdir = NULL;

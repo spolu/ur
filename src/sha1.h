@@ -48,3 +48,13 @@ void moz_SHA1_Final(unsigned char hashout[20], moz_SHA_CTX *ctx);
 #define ur_SHA1_Init	moz_SHA1_Init
 #define ur_SHA1_Update	moz_SHA1_Update
 #define ur_SHA1_Final	moz_SHA1_Final
+
+
+int sha1_to_hex(const unsigned char *sha1, char *hexbuf);
+int hex_to_sha1(const char *hex, unsigned char *sha1);
+
+extern const signed char hexval_table[256];
+static inline unsigned int hexval(unsigned char c)
+{
+  return hexval_table[c];
+}

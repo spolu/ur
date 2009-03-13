@@ -7,22 +7,17 @@
 /*
  * returns an object descriptor at the begining of object.
  */
-int object_open (unsigned char sha1[20]);
+int object_open (const unsigned char sha1[20]);
 
 /*
- * close the the object opened for read.
- */
-int object_close (int od);
-
-/*
- * returns an object descriptor for writing.
+ * returns a file descriptor for writing.
  */
 int object_create ();
 
 /*
- * finalizes object from descriptor.
+ * finalizes object from file descriptor.
  */
-int object_finalize (int od);
+int object_finalize (int fd, unsigned char sha1[20]);
 
 /*
  * returns the size of an object.

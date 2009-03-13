@@ -2,7 +2,7 @@
 #define _UR_STATE_H
 
 #define UR_DIR ".ur"
-#define UR_DIR_OBJECT ".ur/objects"
+#define UR_DIR_OBJECTS ".ur/objects"
 #define UR_DIR_HEADS ".ur/heads"
 #define UR_DIR_SHADOWS ".ur/shadows"
 #define UR_INDEX ".ur/index"
@@ -42,7 +42,7 @@ struct state
  * global ur state used by all functions to perform action on the
  * curently considered directory.
  */
-struct state ur_state;
+extern struct state ur_state;
 
 
 /*
@@ -68,6 +68,14 @@ int state_read (const char *path);
  */
 int ur_lock (const char *path);
 int ur_unlock (const char *path);
+
+/*
+ * helper functions for .ur subdir access
+ */
+int subdir_check (const char *path, const char *dir);
+int file_check (const char *root, const char *path);
+int subdir_create (const char *root, const char *path);
+int file_open (const char *root, const char *path, int oflag);
 
 
 #endif

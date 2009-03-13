@@ -3,11 +3,11 @@ CFLAGS = -Wall -g -std=gnu99
 LIBS = 
 MAKE = make
 
-UR_SRC = list.c io.c sha1.c state.c
+UR_SRC = list.c io.c sha1.c state.c commit.c object.c
 ur_obj = $(UR_SRC:.c=.o)
 
 
-UR_INIT_SRC = ur-init.c
+UR_INIT_SRC = cmd-init.c ur-init.c
 ur_init_obj = $(UR_INIT_SRC:.c=.o)
 UR_INIT_TARGET = ../bin/ur-init
 

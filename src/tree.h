@@ -20,7 +20,7 @@ struct branch_tree_entry
   const char *branch;
   
   struct list_elem elem;
-}
+};
 
 struct tree 
 {
