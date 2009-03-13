@@ -10,7 +10,8 @@
 struct blob_tree_entry 
 {
   char *name;
-  char *commit;
+  unsigned char commit[20];  //changed
+  //char *commit;
 
   struct list_elem elem;  
 };
@@ -20,6 +21,7 @@ struct branch_tree_entry
 {
   char *name;
   char *branch;
+  unsigned char commit[20];  //added
   
   struct list_elem elem;
 };
@@ -67,13 +69,13 @@ int tree_destroy (struct tree *tree);
  * add blob_tree_entry to tree. idempotent
  * replace name if already existing
  */
-int tree_blob_entry_add (struct tree *tree, char *name, char *commit);
+int tree_blob_entry_add (struct tree *tree, char *name, unsigned char commit[20]);
 
 /*
  * add branch_tree_entry to tree. idempotent.
  * replace name if already existing
  */
-int tree_branch_entry_add (struct tree *tree, char *name, char *branch);
+int tree_branch_entry_add (struct tree *tree, char *name, char *branch, unsigned char commit[20]);
 
 
 /*

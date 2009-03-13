@@ -5,6 +5,7 @@
 #include "tree.h"
 #include "list.h"
 #include "io.h"
+#include "sha1.h"
 
 struct tree TREE_INITIALIZER;
 
@@ -34,7 +35,8 @@ tree_objectify (struct tree *tree, unsigned char sha1[20])
     {
       struct blob_tree_entry *en = list_entry (e, struct blob_tree_entry, elem);
       writeline (od, en->name, strlen (en->name), "\n");
-      writeline (od, en->commit, strlen (en->commit), "\n");
+      sha1_to_hex (en->commit, buf);
+      writeline (od, buf, strlen (buf), "\n");
     }
   
   sprintf (buf, "%d", (int) list_size (&tree->branch_entries));
@@ -46,6 +48,8 @@ tree_objectify (struct tree *tree, unsigned char sha1[20])
       struct branch_tree_entry *en = list_entry (e, struct branch_tree_entry, elem);
       writeline (od, en->name, strlen (en->name), "\n");
       writeline (od, en->branch, strlen (en->branch), "\n");
+      sha1_to_hex (en->commit, buf);
+      writeline (od, buf, strlen (buf), "\n");
     }  
   
   return object_finalize (od, sha1);
@@ -61,8 +65,9 @@ tree_read (struct tree *tree, unsigned char sha1[20])
   int fd = -1, i;
   int blob_cnt = 0;
   int branch_cnt = 0;
-  char * buf;
-  char *name = NULL, *commit = NULL, *branch = NULL;
+  char * buf = NULL;
+  char *name = NULL, *branch = NULL;
+  unsigned char commit[20];
   struct blob_tree_entry *blob_entry = NULL;
   struct branch_tree_entry *branch_entry = NULL;
 
@@ -71,66 +76,58 @@ tree_read (struct tree *tree, unsigned char sha1[20])
   if ((fd = object_open (sha1)) < -1)
     goto error;
   
-  buf = NULL;
   buf = readline (fd);
-  if (buf == NULL)
-    goto error;
+  if (buf == NULL) goto error;
   blob_cnt = atoi (buf);
-  free (buf);
+  free (buf); buf = NULL;
 
   for (i = 0; i < blob_cnt; i ++) 
     {        
-      name = NULL;
-      commit = NULL;
-      blob_entry = NULL;
-
-      buf = NULL;
       buf = readline (fd);
-      if (buf == NULL)
-	goto error;
+      if (buf == NULL) goto error;
       name = buf;
-
       buf = NULL;
+
       buf = readline (fd);
-      if (buf == NULL)
-	goto error;
-      commit = buf;
+      if (buf == NULL) goto error;
+      hex_to_sha1 (buf, commit);
+      free (buf); buf = NULL;
       
       blob_entry = (struct blob_tree_entry *) malloc (sizeof (struct blob_tree_entry));
       if (blob_entry == NULL)
 	goto error;
       
       blob_entry->name = name;
-      blob_entry->commit = commit;
+      memcpy (blob_entry->commit, commit, 20);
 
       list_push_back (&tree->blob_entries, &blob_entry->elem);
+
+      name = NULL;
+      blob_entry = NULL;
   }
   
 
-  buf = NULL;
   buf = readline (fd);
-  if (buf == NULL)
-    goto error;
+  if (buf == NULL) goto error;
   branch_cnt = atoi (buf);
-  free (buf);
+  free (buf); buf = NULL;
 
   for (i = 0; i < branch_cnt; i ++) 
     {        
-      name = NULL;
-      branch = NULL;
-      branch_entry = NULL;
-
-      buf = NULL;
       buf = readline (fd);
-      if (buf == NULL)
-	goto error;
+      if (buf == NULL) goto error;
       name = buf;
-
       buf = NULL;
+
       buf = readline (fd);
-      if (buf == NULL)
-	goto error;
+      if (buf == NULL) goto error;
       branch = buf;
+      buf = NULL;
+
+      buf = readline (fd);
+      if (buf == NULL) goto error;
+      hex_to_sha1 (buf, commit);
+      free (buf); buf = NULL;
       
       branch_entry = (struct branch_tree_entry *) malloc (sizeof (struct branch_tree_entry));
       if (branch_entry == NULL)
@@ -138,24 +135,24 @@ tree_read (struct tree *tree, unsigned char sha1[20])
       
       branch_entry->name = name;
       branch_entry->branch = branch;
+      memcpy (branch_entry->commit, commit, 20);
 
       list_push_back (&tree->branch_entries, &branch_entry->elem);
+
+      name = NULL;
+      branch = NULL;
+      branch_entry = NULL;
   }
 
   close (fd);
   
   return 0;
+
  error:
-  if (name != NULL)
-    free (name);
-  if (commit != NULL)
-    free (commit);
-  if (branch != NULL)
-    free (branch);
-  if (blob_entry != NULL)
-    free (blob_entry);
-  if (branch_entry != NULL)
-    free (branch_entry);
+  if (name != NULL) free (name);
+  if (branch != NULL) free (branch);
+  if (blob_entry != NULL) free (blob_entry);
+  if (branch_entry != NULL) free (branch_entry);
   
   tree_destroy (tree);
   
@@ -210,7 +207,7 @@ tree_destroy (struct tree *tree)
 
 
 int 
-tree_blob_entry_add (struct tree *tree, char *name, char *commit)
+tree_blob_entry_add (struct tree *tree, char *name, unsigned char commit[20])
 {
   struct blob_tree_entry *entry = NULL;
 
@@ -221,17 +218,12 @@ tree_blob_entry_add (struct tree *tree, char *name, char *commit)
     goto error;
 
   entry->name = NULL;
-  entry->commit = NULL;
 
   entry->name = (char *) malloc (strlen (name) + 1);
-  if (entry->name == NULL)
-    goto error;
-  entry->commit = (char *) malloc (strlen (commit) + 1);
-  if (entry->commit == NULL)
-    goto error;
+  if (entry->name == NULL) goto error;
 
   strcpy (entry->name, name);
-  strcpy (entry->commit, commit);
+  memcpy (entry->commit, commit, 20);
 
   list_push_back (&tree->blob_entries, &entry->elem);
 
@@ -239,39 +231,35 @@ tree_blob_entry_add (struct tree *tree, char *name, char *commit)
 
  error:
   if (entry != NULL) {
-    if (entry->name != NULL)
-      free (entry->name);
-    if (entry->commit != NULL)
-      free (entry->commit);
+    if (entry->name != NULL) free (entry->name);
     free (entry);
   }  
+
   return -1;
 }
 
 
 int 
-tree_branch_entry_add (struct tree *tree, char *name, char *branch)
+tree_branch_entry_add (struct tree *tree, char *name, char *branch, unsigned char commit[20])
 {
   struct branch_tree_entry *entry = NULL;
 
   tree_remove_entry (tree, name);
   
   entry = (struct branch_tree_entry *) malloc (sizeof (struct branch_tree_entry));
-  if (entry == NULL)
-    goto error;
+  if (entry == NULL) goto error;
 
   entry->name = NULL;
   entry->branch = NULL;
 
   entry->name = (char *) malloc (strlen (name) + 1);
-  if (entry->name == NULL)
-    goto error;
+  if (entry->name == NULL) goto error;
   entry->branch = (char *) malloc (strlen (branch) + 1);
-  if (entry->branch == NULL)
-    goto error;
+  if (entry->branch == NULL) goto error;
 
   strncpy (entry->name, name, strlen (name));
   strncpy (entry->branch, branch, strlen (branch));
+  memcpy (entry->commit, commit, 20);
 
   list_push_back (&tree->branch_entries, &entry->elem);
 
@@ -279,12 +267,11 @@ tree_branch_entry_add (struct tree *tree, char *name, char *branch)
 
  error:
   if (entry != NULL) {
-    if (entry->name != NULL)
-      free (entry->name);
-    if (entry->branch != NULL)
-      free (entry->branch);
+    if (entry->name != NULL) free (entry->name);
+    if (entry->branch != NULL) free (entry->branch);
     free (entry);
   }  
+
   return -1;
 }
 
@@ -317,7 +304,6 @@ tree_remove_entry (struct tree *tree, char *name)
   if (blob_entry != NULL) {
     list_remove (&blob_entry->elem);
     free (blob_entry->name);
-    free (blob_entry->commit);
     free (blob_entry);    
   }
 

@@ -18,10 +18,10 @@
 
 struct index_entry
 {
-  const char *name;
+  char *name;
   bool dirty;
   bool added;
-  struct timespec ctime;   //checkout time
+  time_t ctime;   //checkout time
 
   struct list_elem elem;
 };
@@ -29,12 +29,9 @@ struct index_entry
 struct state 
 {
   const char *path;
-
-  char **branches;
-  char *branch;
-  struct tree *head;
-
   struct list index;
+
+  bool alive;
 };
 
 
@@ -58,15 +55,35 @@ int init_ur ();
 int state_check (const char *path);
 
 /*
- * init the state for a directory creating a .ur subdirectory if it
+ * create the state for a directory creating a .ur subdirectory if it
  * does not exist.
  */
-int state_init (const char *path);
+int state_create (const char *path);
 
 /*
  * read the state for a directory.
  */
-int state_read (const char *path);
+int state_init (const char *path);
+
+/*
+ * destroys the state data
+ */
+int state_destroy ();
+
+/*
+ * reads the index using ur_state.path
+ */
+int index_read ();
+
+/*
+ * write back the index
+ */
+int index_write ();
+
+/*
+ * cleans up the index in memory
+ */
+int index_destroy ();
 
 /*
  * locks and unlocks a .ur directory.

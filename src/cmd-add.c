@@ -39,7 +39,7 @@ cmd_add (const char *path, bool recursive)
 	}
       else
 	{
-	  if (state_init (path) != 0) {
+	  if (state_create (path) != 0) {
 	    printf ("%s initialization failed\n", path);
 	    goto error;
 	  }
@@ -53,6 +53,10 @@ cmd_add (const char *path, bool recursive)
     }
 
   free (prt_dir);
+
+  /*
+   * TODO recursion
+   */
   
   return 0;
 
