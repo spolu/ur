@@ -60,6 +60,9 @@ commit_read (struct commit *commit, const unsigned char sha1[20])
 
   commit->msg = NULL;
 
+  if (commit->alive)
+    goto error;
+
   if ((fd = object_open (sha1)) < -1)
     goto error;
 
@@ -110,6 +113,8 @@ commit_read (struct commit *commit, const unsigned char sha1[20])
   readn (fd, commit->msg, len);
 
   close (fd);
+
+  commit->alive = true;
 
   return 0;
  error:  

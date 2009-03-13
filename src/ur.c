@@ -28,8 +28,11 @@ int
 state_check (const char *path)
 {
   int fd = -1;
-  char * head;
-  
+  char * head = NULL;
+  unsigned char sha1[20];
+  struct commit head_commit = COMMIT_INITIALIZER;
+  struct tree head_tree = TREE_INITIALIZER;
+
   if (subdir_check (path, UR_DIR) != 0)
     goto error;
   
@@ -48,7 +51,7 @@ state_check (const char *path)
   if (file_check (path, UR_HEAD) != 0)
     goto error;
 
-  if ((fd = file_open (path, UR_HEAD, O_RDWR)) < 0)
+  if ((fd = file_open (path, UR_HEAD, O_RDONLY)) < 0)
     goto error;
 
   head = readline (fd);
@@ -57,12 +60,46 @@ state_check (const char *path)
   if (head == NULL)
     goto error;
   
-  printf ("head found: %s\n", head);
+  if ((fd = file_open (path, head, O_RDONLY)) < 0)
+    goto error;
+
   free (head);
+  head = NULL;
+
+  head = readline (fd);
+  hex_to_sha1 (head, sha1);
+
+  free (head);
+  head = NULL;
+  close (fd);
+  
+  /*
+   * used by commit_read
+   */
+  ur_state.path = path;
+  ur_state.branches = NULL;
+  ur_state.branch = NULL;
+  ur_state.head = NULL;
+
+  if (commit_read (&head_commit, sha1) < 0)
+    goto error;
+
+  memcpy (sha1, head_commit.object_sha1, 20);
+  commit_destroy (&head_commit);
+
+  if (tree_read (&head_tree, sha1) < 0)
+    goto error;
+
+  tree_destroy (&head_tree);
 
   return 0;
 
  error:
+  if (head != NULL)
+    free (head);
+  commit_destroy (&head_commit);
+  tree_destroy (&head_tree);
+
   return -1;
 }
 
