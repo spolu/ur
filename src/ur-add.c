@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "cmd-add.h"
+#include "ur-cmd.h"
+#include "ur.h"
 
 int
 main (int argc, char ** argv)

@@ -5,13 +5,12 @@
 
 #include "object.h"
 #include "list.h"
-
+#include "ur.h"
 
 struct blob_tree_entry 
 {
   char *name;
-  unsigned char commit[20];  //changed
-  //char *commit;
+  unsigned char commit[20];
 
   struct list_elem elem;  
 };
@@ -21,7 +20,7 @@ struct branch_tree_entry
 {
   char *name;
   char *branch;
-  unsigned char commit[20];  //added
+  unsigned char commit[20];
   
   struct list_elem elem;
 };
@@ -38,20 +37,20 @@ struct tree
 extern struct tree TREE_INITIALIZER;
 
 /*
- *
+ * tree module initialization
  */
 int init_tree ();
 
 /*
  * creates a new object for tree.
  */
-int tree_objectify (struct tree *tree, unsigned char sha1[20]);
+int tree_objectify (state_t *ur, struct tree *tree, unsigned char sha1[20]);
 
 
 /*
  * reads tree from object
  */
-int tree_read (struct tree *tree, unsigned char sha1[20]);
+int tree_read (state_t *ur, struct tree *tree, unsigned char sha1[20]);
 
 
 /*
@@ -81,6 +80,6 @@ int tree_branch_entry_add (struct tree *tree, char *name, char *branch, unsigned
 /*
  * removes any entry associated with name
  */
-int tree_remove_entry (struct tree *tree, char *name);
+int tree_entry_remove (struct tree *tree, char *name);
 
 #endif

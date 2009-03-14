@@ -3,11 +3,11 @@ CFLAGS = -Wall -g -std=gnu99
 LIBS = 
 MAKE = make
 
-UR_SRC = list.c io.c sha1.c ur.c commit.c object.c tree.c
+UR_SRC = list.c io.c sha1.c helper.c commit.c object.c tree.c index.c ur.c ur-cmd.c
 ur_obj = $(UR_SRC:.c=.o)
 
 
-UR_ADD_SRC = cmd-add.c ur-add.c
+UR_ADD_SRC = ur-add.c
 ur_add_obj = $(UR_ADD_SRC:.c=.o)
 UR_ADD_TARGET = ../bin/ur-add
 

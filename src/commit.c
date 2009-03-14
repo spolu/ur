@@ -19,13 +19,13 @@ init_commit ()
 
 
 int 
-commit_objectify (struct commit *commit, unsigned char sha1[20])
+commit_objectify (state_t *ur, struct commit *commit, unsigned char sha1[20])
 {
   int od = -1;
   char * ct;
   char buf [50];
 
-  if ((od = object_create ()) < 0) goto error;
+  if ((od = object_create (ur)) < 0) goto error;
 
   ct = ctime (&commit->date);
   writeline (od, ct, strlen (ct) - 1, "\n");
@@ -41,14 +41,14 @@ commit_objectify (struct commit *commit, unsigned char sha1[20])
   writeline (od, buf, strlen (buf), "\n");
   writen (od, commit->msg, strlen (commit->msg));
 
-  return object_finalize (od, sha1);
+  return object_finalize (ur, od, sha1);
 
  error:
   return -1;
 }
 
 int 
-commit_read (struct commit *commit, const unsigned char sha1[20])
+commit_read (state_t *ur, struct commit *commit, const unsigned char sha1[20])
 {
   int fd = -1;
   char * buf = NULL;
@@ -60,7 +60,7 @@ commit_read (struct commit *commit, const unsigned char sha1[20])
 
   if (commit->alive) goto error;
 
-  if ((fd = object_open (sha1)) < -1) goto error;
+  if ((fd = object_open (ur, sha1)) < -1) goto error;
 
   buf = readline (fd);  
   if (buf == NULL) goto error;

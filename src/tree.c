@@ -18,13 +18,13 @@ init_tree ()
 
 
 int 
-tree_objectify (struct tree *tree, unsigned char sha1[20])
+tree_objectify (state_t *ur, struct tree *tree, unsigned char sha1[20])
 {
   struct list_elem *e;
   int od = -1;
   char buf[50];
 
-  if ((od = object_create ()) < 0)
+  if ((od = object_create (ur)) < 0)
     goto error;
   
   sprintf (buf, "%d", (int) list_size (&tree->blob_entries));
@@ -52,7 +52,7 @@ tree_objectify (struct tree *tree, unsigned char sha1[20])
       writeline (od, buf, strlen (buf), "\n");
     }  
   
-  return object_finalize (od, sha1);
+  return object_finalize (ur, od, sha1);
 
  error:
   return -1;
@@ -60,7 +60,7 @@ tree_objectify (struct tree *tree, unsigned char sha1[20])
 
 
 int 
-tree_read (struct tree *tree, unsigned char sha1[20])
+tree_read (state_t *ur, struct tree *tree, unsigned char sha1[20])
 {
   int fd = -1, i;
   int blob_cnt = 0;
@@ -73,7 +73,7 @@ tree_read (struct tree *tree, unsigned char sha1[20])
 
   tree_init (tree);
 
-  if ((fd = object_open (sha1)) < -1)
+  if ((fd = object_open (ur, sha1)) < -1)
     goto error;
   
   buf = readline (fd);
@@ -211,7 +211,7 @@ tree_blob_entry_add (struct tree *tree, char *name, unsigned char commit[20])
 {
   struct blob_tree_entry *entry = NULL;
 
-  tree_remove_entry (tree, name);
+  tree_entry_remove (tree, name);
   
   entry = (struct blob_tree_entry *) malloc (sizeof (struct blob_tree_entry));
   if (entry == NULL)
@@ -244,7 +244,7 @@ tree_branch_entry_add (struct tree *tree, char *name, char *branch, unsigned cha
 {
   struct branch_tree_entry *entry = NULL;
 
-  tree_remove_entry (tree, name);
+  tree_entry_remove (tree, name);
   
   entry = (struct branch_tree_entry *) malloc (sizeof (struct branch_tree_entry));
   if (entry == NULL) goto error;
@@ -277,7 +277,7 @@ tree_branch_entry_add (struct tree *tree, char *name, char *branch, unsigned cha
 
 
 int
-tree_remove_entry (struct tree *tree, char *name)
+tree_entry_remove (struct tree *tree, char *name)
 {
   struct blob_tree_entry *blob_entry = NULL;
   struct branch_tree_entry *branch_entry = NULL;

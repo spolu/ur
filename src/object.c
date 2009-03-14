@@ -7,11 +7,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "debug.h"
 #include "object.h"
 #include "ur.h"
 #include "list.h"
 #include "sha1.h"
 #include "io.h"
+#include "helper.h"
 
 static int obj_nb;
 static bool initialized = false;
@@ -25,11 +27,13 @@ struct obj_fd_entry {
 struct list obj_fd_map;
 
 int 
-object_open (const unsigned char sha1[20])
+object_open (state_t *ur, const unsigned char sha1[20])
 {
   char *path = NULL;
   char hex[50];
   int fd = -1;
+
+  ASSERT (ur->alive);
 
   path = (char *) malloc (strlen (UR_DIR_OBJECTS) + 40 + 2);
   if (path == NULL)
@@ -38,7 +42,7 @@ object_open (const unsigned char sha1[20])
   sha1_to_hex (sha1, hex);  
   sprintf (path, "%s/%s", UR_DIR_OBJECTS, hex);
   
-  if ((fd = file_open (ur_state.path, path, O_RDONLY)) < 0)
+  if ((fd = file_open (ur->path, path, O_RDONLY)) < 0)
     goto error;
   
   return fd;
@@ -50,11 +54,13 @@ object_open (const unsigned char sha1[20])
 }
 
 int 
-object_create ()
+object_create (state_t *ur)
 {
   char *tmp_path = NULL;
   int fd = -1;
   int objd;
+
+  ASSERT (ur->alive);
 
   if (!initialized) {
     list_init (&obj_fd_map);
@@ -70,7 +76,7 @@ object_create ()
   
   sprintf (tmp_path, "%s/obj_tmp-%d", UR_DIR, objd);
   
-  if ((fd = file_open (ur_state.path, tmp_path, O_CREAT | O_TRUNC | O_WRONLY)) < 0)
+  if ((fd = file_open (ur->path, tmp_path, O_CREAT | O_TRUNC | O_WRONLY)) < 0)
     goto error;
 
   fchmod (fd, S_IRUSR | S_IWUSR | S_IROTH);
@@ -93,7 +99,7 @@ object_create ()
 }
 
 int 
-object_finalize (int fd, unsigned char sha1[20])
+object_finalize (state_t *ur, int fd, unsigned char sha1[20])
 {
   char *tmp_path = NULL;
   char *obj_path = NULL;
@@ -105,6 +111,8 @@ object_finalize (int fd, unsigned char sha1[20])
 
   char buf[512];
   size_t len;
+
+  ASSERT (ur->alive);
 
   if (!initialized) {
     list_init (&obj_fd_map);
@@ -129,13 +137,13 @@ object_finalize (int fd, unsigned char sha1[20])
 
   list_remove (&entry->elem);
   
-  tmp_path = (char *) malloc (strlen (ur_state.path) + 
+  tmp_path = (char *) malloc (strlen (ur->path) + 
 			      strlen (UR_DIR) + 
 			      strlen ("obj_tmp-") + 40);
   if (tmp_path == NULL)
     goto error;
   
-  sprintf (tmp_path, "%s/%s/obj_tmp-%d", ur_state.path, UR_DIR, entry->objd);
+  sprintf (tmp_path, "%s/%s/obj_tmp-%d", ur->path, UR_DIR, entry->objd);
   
   free (entry);
   entry = NULL;
@@ -153,13 +161,13 @@ object_finalize (int fd, unsigned char sha1[20])
 
   ur_SHA1_Final (sha1, &ctx);
   
-  obj_path = (char *) malloc (strlen (ur_state.path) +
+  obj_path = (char *) malloc (strlen (ur->path) +
 			      strlen (UR_DIR_OBJECTS) + 50);
   if (obj_path == NULL)
     goto error;
 
   sha1_to_hex (sha1, hex);
-  sprintf (obj_path, "%s/%s/%s", ur_state.path, UR_DIR_OBJECTS, hex);
+  sprintf (obj_path, "%s/%s/%s", ur->path, UR_DIR_OBJECTS, hex);
   
   if (link (tmp_path, obj_path) != 0)
     goto error;
@@ -183,7 +191,7 @@ object_finalize (int fd, unsigned char sha1[20])
 }
 
 size_t 
-object_size (unsigned char sha1[20])
+object_size (state_t *ur, unsigned char sha1[20])
 {
   return 0;
 }
