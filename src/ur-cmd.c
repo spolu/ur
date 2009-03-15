@@ -174,5 +174,6 @@ cmd_add (const char *path, bool recursive)
 int
 cmd_status (const char *path, bool recursive)
 {
+  
   return 0;
 }
