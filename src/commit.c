@@ -132,7 +132,7 @@ int commit_create (struct commit *commit,
   
   if (commit->msg == NULL) goto error;
   
-  strncpy (commit->msg, msg, strlen (msg));
+  strncpy (commit->msg, msg, strlen (msg) + 1);
 
   commit->date = time (NULL);  
   commit->alive = true;

@@ -47,7 +47,7 @@ state_init (state_t *ur, const char *path)
 
   path_cpy = (char *) malloc (strlen (path) + 1);
   if (path_cpy == NULL) goto error;
-  strncpy (path_cpy, path, strlen (path));
+  strncpy (path_cpy, path, strlen (path) + 1);
   ur->path = path_cpy;  
   ur->alive = true;
 
@@ -127,9 +127,7 @@ ur_create (const char *path)
   ur.alive = true;
 
   if (subdir_create (path, UR_DIR) != 0) goto error;  
-  printf ("ur_dir done\n");
   if (subdir_create (path, UR_DIR_HEADS) != 0) goto error;
-  printf ("ur_dir_heads done\n");
   if (subdir_create (path, UR_DIR_SHADOWS) != 0) goto error;
   if (subdir_create (path, UR_DIR_OBJECTS) != 0) goto error;
 

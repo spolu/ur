@@ -14,6 +14,7 @@ int file_open (const char *root, const char *path, int oflag);
  * parent_dir / filename extraction
  */
 int parent_dir (const char *path, char * parent);
+int dirname (const char *path, char *name);
 int filename (const char *path, char *name);
 
 

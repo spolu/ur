@@ -222,7 +222,7 @@ tree_blob_entry_add (struct tree *tree, char *name, unsigned char commit[20])
   entry->name = (char *) malloc (strlen (name) + 1);
   if (entry->name == NULL) goto error;
 
-  strcpy (entry->name, name);
+  strncpy (entry->name, name, strlen (name) + 1);
   memcpy (entry->commit, commit, 20);
 
   list_push_back (&tree->blob_entries, &entry->elem);
@@ -257,8 +257,8 @@ tree_branch_entry_add (struct tree *tree, char *name, char *branch, unsigned cha
   entry->branch = (char *) malloc (strlen (branch) + 1);
   if (entry->branch == NULL) goto error;
 
-  strncpy (entry->name, name, strlen (name));
-  strncpy (entry->branch, branch, strlen (branch));
+  strncpy (entry->name, name, strlen (name) + 1);
+  strncpy (entry->branch, branch, strlen (branch) + 1);
   memcpy (entry->commit, commit, 20);
 
   list_push_back (&tree->branch_entries, &entry->elem);

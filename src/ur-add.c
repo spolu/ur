@@ -15,7 +15,7 @@ main (int argc, char ** argv)
     return -1;
   }
 
-  return cmd_add (argv[1], false);    
+  return cmd_add (argv[1], true);    
   
   return 0;
 }

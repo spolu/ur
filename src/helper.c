@@ -17,10 +17,7 @@ subdir_check (const char *root, const char *path)
   if (subdir == NULL)
     return -1;
 
-  if (strlen (root) == 0 || path[strlen (root) - 1] == '/')
-    sprintf (subdir, "%s%s", root, path);
-  else
-    sprintf (subdir, "%s/%s", root, path);
+  sprintf (subdir, "%s/%s", root, path);
   
   if (lstat64 (subdir, &st_buf) != 0) goto error;
   if (!(st_buf.st_mode & S_IFDIR)) goto error;
@@ -47,10 +44,7 @@ file_check (const char *root, const char *path)
   if (file == NULL)
     return -1;
 
-  if (strlen (root) == 0 || path[strlen (root) - 1] == '/')
-    sprintf (file, "%s%s", root, path);
-  else
-    sprintf (file, "%s/%s", root, path);
+  sprintf (file, "%s/%s", root, path);
   
   if (lstat64 (file, &st_buf) != 0) goto error;
   if (!(st_buf.st_mode & S_IFREG)) goto error;
@@ -116,12 +110,64 @@ subdir_create (const char *root, const char *path)
 }
 
 
+int
+dirname (const char *path, char *name)
+{
+  int i = 0;
+  struct stat64 st_buf;  
+  char * path_cpy;
+
+  if (lstat64 (path, &st_buf) != 0) {
+    printf ("%s does not exist\n", path);
+    goto error;
+  } 
+
+  path_cpy = (char *) malloc (strlen (path) + 1);
+  if (path_cpy == NULL) goto error;  
+  strncpy (path_cpy, path, strlen (path) + 1);
+
+  if (strcmp (path_cpy, "/") == 0 ||
+      strcmp (path_cpy, ".") == 0) {
+    strncpy (name, path_cpy, strlen (path_cpy) + 1);    
+    free (path_cpy); path_cpy = NULL;
+
+    //printf ("dirname: %s -> %s\n", path, name);
+    return 0;
+  }
+  
+  if (path_cpy[strlen (path_cpy) - 1] == '/') {
+    path_cpy [strlen (path_cpy) - 1] = 0;
+  }
+  
+  for (i = strlen (path_cpy) - 1; i >= 0; i --) {
+    if (path_cpy[i] == '/')
+      break;
+  }
+  
+  if (i < 0) {
+    strncpy (name, path_cpy, strlen (path) + 1);
+  }
+  
+  else {
+    strncpy (name, (path_cpy+(i+1)), strlen ((path_cpy+(i+1))) + 1);
+  }
+
+  free (path_cpy); path_cpy = NULL;  
+
+  //printf ("dirname: %s -> %s\n", path, name);
+  return 0;
+
+ error:
+  if (path_cpy != NULL) free (path_cpy);
+  return -1;
+}
 
 int
 filename (const char *path, char *name)
 {
   int i = 0;
   struct stat64 st_buf;  
+  const char * path_cpy;
 
   if (lstat64 (path, &st_buf) != 0) {
     printf ("%s does not exist\n", path);
@@ -138,16 +184,15 @@ filename (const char *path, char *name)
   }
   
   if (i < 0) {
-    strncpy (name, path, strlen (path));
+    strncpy (name, path, strlen (path) + 1);
   }
 
   else {
-    
-    strncpy (name, (path+(i+1)), strlen ((path+(i+1))));
+    path_cpy = path+(i+1);
+    strncpy (name, path_cpy, strlen (path_cpy) + 1);
   }
   
-  printf ("filename %d : %s -> %s\n", i, path, name);
-
+  //printf ("filename: %s -> %s\n", path, name);
   return 0;
 
  error:
@@ -173,7 +218,7 @@ parent_dir (const char *path, char *parent)
   }
     
 
-  strncpy (parent, path, strlen (path));
+  strncpy (parent, path, strlen (path) + 1);
   if (parent[strlen (parent) - 1] == '/') {
     parent[strlen (parent) - 1] = 0;
   }
@@ -200,7 +245,7 @@ parent_dir (const char *path, char *parent)
       }
     }
 
-  printf ("prt_dir : %s -> %s\n", path, parent);
+  //printf ("prt_dir : %s -> %s\n", path, parent);
 
   return 0;
   

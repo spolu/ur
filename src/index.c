@@ -56,10 +56,15 @@ index_read (state_t *ur, struct index *index)
             
       buf = readline (fd);  
       if (buf == NULL) goto error;
-      cp = strptime (buf, "%a %b %d %T %Y", &tm);
-      ctime = mktime (&tm);
-      free (buf); buf = NULL;
-      
+      if (strncmp (buf, "UNSET", strlen ("UNSET")) == 0) {
+	ctime = 0;
+      }
+      else {
+	cp = strptime (buf, "%a %b %d %T %Y", &tm);
+	ctime = mktime (&tm);
+      }
+      free (buf); buf = NULL;  
+    
       index_entry = (struct index_entry *) malloc (sizeof (struct index_entry));
       if (index_entry == NULL)
 	goto error;
@@ -113,11 +118,18 @@ index_write (state_t *ur, struct index *index)
        e = list_next (e))
       {
 	struct index_entry *en = list_entry (e, struct index_entry, elem);	
+
 	writeline (fd, en->name, strlen (en->name), "\n");
 	sprintf (buf, "%d", en->status);
 	writeline (fd, buf, strlen (buf), "\n");	
-	ct = ctime (&en->ctime);
-	writeline (fd, ct, strlen (ct) - 1, "\n");      	
+	if (en->ctime == 0) {
+	  sprintf (buf, "UNSET");
+	  writeline (fd, buf, strlen (buf), "\n");
+	}
+	else { 
+	  ct = ctime (&en->ctime);
+	  writeline (fd, ct, strlen (ct) - 1, "\n");
+	}
       }
 
     index->dirty = false;
@@ -140,11 +152,10 @@ index_entry_set (struct index *index, char *name, int status, time_t ctime)
   if (entry == NULL) goto error;
 
   entry->name = NULL;
-  
   entry->name = (char *) malloc (strlen (name) + 1);
   if (entry->name == NULL) goto error;
 
-  strncpy (entry->name, name, strlen (name));
+  strncpy (entry->name, name, strlen (name) + 1);
   entry->status = status;
   entry->ctime = ctime;
 
@@ -235,7 +246,7 @@ index_entry_set_status (struct index *index, char *name, int status)
   struct list_elem *e;
 
   if (!index->alive) goto error;
-
+  
   for (e = list_begin (&index->entries); e != list_end (&index->entries);
        e = list_next (e))
     {
