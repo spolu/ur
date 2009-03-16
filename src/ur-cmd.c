@@ -174,6 +174,53 @@ cmd_add (const char *path, bool recursive)
 int
 cmd_status (const char *path, bool recursive)
 {
+  struct stat64 st_buf;
+  state_t ur = STATE_INITIALIZER;
+  struct index index = INDEX_INITIALIZER; 
+  int status;
   
+  if (lstat64 (path, &st_buf) != 0) fail("%s does not exist", path);
+  assert (st_buf.st_mode & S_IFDIR);
+
+  if (ur_check (path) == 0) {
+    if (state_init (&ur, path) != 0) fail ("fail reading state of %s", path);
+    if (index_read (&ur, &index) != 0) fail ("fail reading index of %s", path);
+    
+    
+  }
+  else
+    fail ("%s not initialized\n", path);
+
+  /*
+   * recursion
+   */
+  if (recursive) 
+    {
+      DIR *dp;
+      struct dirent *ep;
+      
+      dp = opendir (path);
+      if (dp != NULL)
+	{
+	  while ((ep = readdir (dp))) {
+	    if (ep->d_name[0] != '.') 
+	      {		
+		char *npath;
+		npath = (char *) malloc (strlen (path) +
+					 strlen (ep->d_name) + 2);
+		if (path[strlen (path) -1] == '/')
+		  sprintf (npath, "%s%s", path, ep->d_name);
+		else
+		  sprintf (npath, "%s/%s", path, ep->d_name);
+		cmd_status (npath, recursive);
+		free (npath);
+	      }	    
+	  }
+	  (void) closedir (dp);
+	}
+      else
+	fail ("could not open directory %s", path);      
+    }  
+
   return 0;
 }

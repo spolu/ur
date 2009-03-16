@@ -42,6 +42,13 @@ extern struct index INDEX_INITIALIZER;
 int init_index ();
 
 /*
+ * index update
+ * keep the added
+ * update tracked, mark them dirty if needed
+ */
+
+
+/*
  * reads the index from disk using ur_state path
  */
 int index_read (state_t *ur, struct index *index);
