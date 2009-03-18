@@ -12,6 +12,7 @@
 #include "index.h"
 #include "debug.h"
 #include "branch.h"
+#include "blob.h"
 
 void
 fail (const char *fmt, ...) 
@@ -155,7 +156,7 @@ cmd_add (const char *path, bool recursive)
 		char *npath;
 		npath = (char *) malloc (strlen (path) +
 					 strlen (ep->d_name) + 2);
-		if (npath[strlen (path) -1] == '/')
+		if (path[strlen (path) -1] == '/')
 		  sprintf (npath, "%s%s", path, ep->d_name);
 		else
 		  sprintf (npath, "%s/%s", path, ep->d_name);
@@ -284,6 +285,8 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
 {
   state_t ur = STATE_INITIALIZER;
   struct index index = INDEX_INITIALIZER; 
+  struct tree tree = TREE_INITIALIZER;
+  struct tree ptree = TREE_INITIALIZER;
   struct stat64 st_buf;
   DIR *dp;
   struct dirent *ep;
@@ -342,9 +345,17 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
 
       branchname = branch_get_head_name (&ur);
       printf ("*** %s \n    (branch: %s)\n", ur.path, branchname);
+
+       // we start by setting the tree to its parent state
+      if (branch_read_tree (ur, &tree, branchname) != 0)
+	fail ("could not read tree for %s (branch: %s)", ur.path, branchname);
+
+      // keeps the parent tree around
+      if (branch_read_tree (ur, &ptree, branchname) != 0)
+	fail ("could not read tree for %s (branch: %s)", ur.path, branchname);
       free (branchname); branchname = NULL;
 
-      // reading added dirty files
+      // commiting added dirty files / branch
       for (e = list_begin (&index.entries); e != list_end (&index.entries);
 	   e = list_next (e))
 	{
@@ -352,11 +363,12 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
 	  if ((en->status & S_IPST) &&
 	      (en->status & S_IADD) && 
 	      (en->status & S_IDRT)) {
-	    printf ("#  added     : %s/%s\n", path, en->name);
+	    printf ("#  added     : %s/%s\n", path, en->name);	    
+	    // commit this file/branch
 	  }
 	}
 
-      // reading dirty but not added
+      // commiting dirty but not added file if all
       for (e = list_begin (&index.entries); e != list_end (&index.entries);
 	   e = list_next (e))
 	{
@@ -365,31 +377,32 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
 	      !(en->status & S_IADD) && 
 	      (en->status & S_IDRT) && 
 	      (en->status & S_ITRK)) {
-	    printf ("#  dirty     : %s/%s\n", path, en->name);
+	    if (all) {
+	      printf ("#  dirty     : %s/%s\n", path, en->name);
+	      // commit this file/branch
+	    }
 	  }
 	}
 
-      // reading untracked files
+      // removing non present / untracked files / branch 
       for (e = list_begin (&index.entries); e != list_end (&index.entries);
 	   e = list_next (e))
 	{
 	  struct index_entry *en = list_entry (e, struct index_entry, elem);	
-	  if ((en->status & S_IPST) &&
-	      !(en->status & S_ITRK) && 
-	      !(en->status & S_IADD)) {
-	    printf ("#  untracked : %s/%s\n", path, en->name);
+	  if (!(en->status & S_IPST) ||
+	      ((en->status & S_IPST) &&
+	       !(en->status & S_ITRK) && 
+	       !(en->status & S_IADD))) {
+	    tree_entry_remove (&tree, en->name);
 	  }
 	}
       
+      tree_destroy (&tree);
       index_destroy (&index);
       state_destroy (&ur);    
     }
   else
     return 0;  
-
-
-  return 0;
-  
 
   return 0;
 }

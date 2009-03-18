@@ -12,6 +12,7 @@
 #define TREE_TYPE 0x1
 #define BLOB_TYPE 0x2
 
+struct tree;
 
 struct commit 
 {

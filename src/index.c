@@ -98,7 +98,7 @@ index_update (state_t *ur, struct index *index)
 				 strlen (ep->d_name) + 2);
 	if (npath == NULL) goto error;
 
-	if (npath[strlen (ur->path) -1] == '/')
+	if (ur->path[strlen (ur->path) - 1] == '/')
 	  sprintf (npath, "%s%s", ur->path, ep->d_name);
 	else
 	  sprintf (npath, "%s/%s", ur->path, ep->d_name);

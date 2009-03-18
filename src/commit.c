@@ -7,12 +7,16 @@
 #include "object.h"
 #include "io.h"
 #include "sha1.h"
+#include "tree.h"
 
 struct commit COMMIT_INITIALIZER;
+
+unsigned char null_sha1[20];
 
 int 
 init_commit ()
 {
+  memset (null_sha1, 0, 20);
   memset (&COMMIT_INITIALIZER, 0, sizeof (struct commit));
   return 0;
 }

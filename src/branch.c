@@ -106,3 +106,42 @@ branch_get_head_name (state_t *ur)
   if (branchname != NULL) free (branchname);
   return NULL;  
 } 
+
+
+
+int
+commit_branch_using_tree (state_t *ur,
+			  struct tree *tree, 
+			  char *name)
+{
+  char *branch = NULL, *path = NULL;
+  unsigned char commit[20];
+  state_t b_ur = STATE_INITIALIZER;
+
+  path = (char *) malloc (strlen (ur->path) +
+			  strlen (name) + 2);
+  if (ur->path[strlen (path) -1] == '/')
+    sprintf (path, "%s%s", ur->path, name);
+  else
+    sprintf (path, "%s/%s", ur->path, name);
+  if (state_init (&b_ur, path) != 0) goto error;  
+  free (path); path = NULL;
+
+  branch = branch_get_head_name (&b_ur);
+  if (branch == NULL) goto error;
+  if (branch_read_commit_sha1 (&b_ur, commit, branch) != 0) goto error;
+  free (branch); branch = NULL;
+  state_destroy (&b_ur);
+    
+  if (tree_branch_entry_add (tree, name, branch, commit) != 0) goto error;
+
+  return 0;
+
+ error:
+  if (branch != NULL) free (branch);
+  if (path != NULL) free (path);
+  state_destroy (&b_ur);
+  tree_destroy (&b_tree);
+  return -1;
+}
+			  

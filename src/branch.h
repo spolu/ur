@@ -20,4 +20,14 @@ int branch_read_tree (state_t *ur, struct tree *tree, const char *branchname);
 char * branch_get_head_name (state_t *ur);
 
 
+/*
+ * commits branch represented by name
+ * using ptree as parent
+ * updating tree
+ */
+int commit_branch_using_tree (state_t *ur,
+			      struct tree *tree, 
+			      char *name);
+
+
 #endif
