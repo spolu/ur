@@ -53,7 +53,7 @@ tree_objectify (state_t *ur, struct tree *tree, unsigned char sha1[20])
     }  
   
   return object_finalize (ur, od, sha1);
-
+  
  error:
   return -1;
 }
@@ -202,6 +202,8 @@ tree_destroy (struct tree *tree)
     }
 
   tree->alive = false;
+  *tree = TREE_INITIALIZER;
+
   return 0;
 }
 
@@ -315,4 +317,52 @@ tree_entry_remove (struct tree *tree, char *name)
   }
 
   return 0;
+}
+
+
+int 
+tree_get_blob_entry (struct tree *tree, char *name, struct blob_tree_entry *entry)
+{
+  struct blob_tree_entry *blob_entry = NULL;
+  struct list_elem *e;
+  
+  for (e = list_begin (&tree->blob_entries); e != list_end (&tree->blob_entries);
+       e = list_next (e))
+    {
+      struct blob_tree_entry *en = list_entry (e, struct blob_tree_entry, elem);
+      if (strncmp (en->name, name, strlen (name)) == 0) {
+	blob_entry = en;
+      }
+    }
+
+  if (blob_entry != NULL) {
+    memcpy (entry, blob_entry, sizeof (struct blob_tree_entry));
+    return 0;
+  }
+
+  return -1;
+}
+
+
+int 
+tree_get_branch_entry (struct tree *tree, char *name, struct branch_tree_entry *entry)
+{
+  struct branch_tree_entry *branch_entry = NULL;
+  struct list_elem *e;
+  
+  for (e = list_begin (&tree->branch_entries); e != list_end (&tree->branch_entries);
+       e = list_next (e))
+    {
+      struct branch_tree_entry *en = list_entry (e, struct branch_tree_entry, elem);
+      if (strncmp (en->name, name, strlen (name)) == 0) {
+	branch_entry = en;
+      }
+    }
+
+  if (branch_entry != NULL) {
+    memcpy (entry, branch_entry, sizeof (struct branch_tree_entry));
+    return 0;
+  }
+
+  return -1;
 }

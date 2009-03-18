@@ -19,7 +19,7 @@ struct index_entry
 {
   char *name;
   int status;
-  time_t ctime;   //checkout time
+  time_t ctime;   
 
   struct list_elem elem;
 };
@@ -46,7 +46,7 @@ int init_index ();
  * keep the added
  * update tracked, mark them dirty if needed
  */
-
+int index_update (state_t *ur, struct index *index);
 
 /*
  * reads the index from disk using ur_state path

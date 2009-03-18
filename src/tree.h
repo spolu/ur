@@ -82,4 +82,12 @@ int tree_branch_entry_add (struct tree *tree, char *name, char *branch, unsigned
  */
 int tree_entry_remove (struct tree *tree, char *name);
 
+
+/*
+ * find the entry relative to name
+ */
+int tree_get_blob_entry (struct tree *tree, char *name, struct blob_tree_entry *entry);
+int tree_get_branch_entry (struct tree *tree, char *name, struct branch_tree_entry *entry);
+
+
 #endif

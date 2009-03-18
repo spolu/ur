@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <dirent.h>
+
 
 #include "debug.h"
 #include "index.h"
@@ -11,9 +14,14 @@
 #include "io.h"
 #include "sha1.h"
 #include "helper.h"
+#include "branch.h"
+#include "commit.h"
+
 
 
 struct index INDEX_INITIALIZER;
+
+static int clear_present (struct index *index);
 
 int
 init_index ()
@@ -21,6 +29,177 @@ init_index ()
   memset (&INDEX_INITIALIZER, 0, sizeof (struct index));
   return 0;
 }
+
+int 
+index_update (state_t *ur, struct index *index)
+{
+  char *branchname = NULL, *npath = NULL, *buf = NULL;
+  struct tree tree = TREE_INITIALIZER;
+  struct commit commit = COMMIT_INITIALIZER;
+  struct list_elem *e;
+  unsigned char sha1[20], nsha1[20];
+  int status, fd = -1;
+  time_t ctime;
+  struct stat64 st_buf;
+  DIR *dp;
+  struct dirent *ep;
+  struct blob_tree_entry blob;
+  struct branch_tree_entry branch;
+  ur_SHA_CTX ctx;
+  size_t len;
+
+  if (!index->alive) goto error;
+  
+  branchname = branch_get_head_name (ur);
+  if (branchname == NULL) goto error;
+  if (branch_read_tree (ur, &tree, branchname) != 0) goto error;
+  free (branchname); branchname = NULL;
+
+  for (e = list_begin (&tree.blob_entries); e != list_end (&tree.blob_entries);
+       e = list_next (e))
+    {
+      struct blob_tree_entry *en = list_entry (e, struct blob_tree_entry, elem);
+
+      status = index_entry_get_status (index, en->name);
+      status |= S_ITRK;
+      
+      memcpy (sha1, en->commit, 20);      
+      if (commit_read (ur, &commit, sha1) != 0) goto error;
+      ctime = commit.ctime;
+      commit_destroy (&commit);
+      
+      if (index_entry_set (index, en->name, status, ctime) != 0) goto error;      
+    }
+  
+  for (e = list_begin (&tree.branch_entries); e != list_end (&tree.branch_entries);
+       e = list_next (e))
+    {
+      struct branch_tree_entry *en = list_entry (e, struct branch_tree_entry, elem);
+
+      status = index_entry_get_status (index, en->name);
+      status |= S_ITRK;
+      
+      memcpy (sha1, en->commit, 20);      
+      if (commit_read (ur, &commit, sha1) != 0) goto error;
+      ctime = commit.ctime;
+      commit_destroy (&commit);
+      
+      if (index_entry_set (index, en->name, status, ctime) != 0) goto error;      
+    }  
+    
+  clear_present (index);
+
+  if ((dp = opendir (ur->path)) == NULL) goto error;
+
+  while ((ep = readdir (dp))) {
+    if (ep->d_name[0] != '.') 
+      {		
+	npath = (char *) malloc (strlen (ur->path) +
+				 strlen (ep->d_name) + 2);
+	if (npath == NULL) goto error;
+
+	if (npath[strlen (ur->path) -1] == '/')
+	  sprintf (npath, "%s%s", ur->path, ep->d_name);
+	else
+	  sprintf (npath, "%s/%s", ur->path, ep->d_name);
+	
+	if (lstat64 (npath, &st_buf) != 0) goto error;
+
+	if (st_buf.st_mode & S_IFREG)
+	  {
+	    status = index_entry_get_status (index, ep->d_name);
+	    status |= S_IPST;
+
+	    /*
+	      if (index_entry_get_ctime (index, ep->d_name) < st_buf.st_mtimespec.tv_sec ||
+	      index_entry_get_ctime (index, ep->d_name) < st_buf.st_ctimespec.tv_sec)
+	      {
+	    */ //Optimization
+		
+	    if(tree_get_blob_entry (&tree, ep->d_name, &blob) == 0)
+	      {
+		printf ("COMPUTING SHA1\n");
+		memcpy (sha1, blob.commit, 20);
+		if (commit_read (ur, &commit, sha1) != 0) goto error;
+		memcpy (sha1, commit.object_sha1, 20);
+		commit_destroy (&commit);
+		
+		if ((fd = open (npath, O_RDONLY)) < 0)
+		  goto error;		
+		ur_SHA1_Init (&ctx);		
+		while ((len = readn (fd, buf, 512)) > 0) {
+		  ur_SHA1_Update (&ctx, buf, len);
+		}		
+		close (fd);		
+		ur_SHA1_Final (nsha1, &ctx);
+		
+		if (memcmp (nsha1, sha1, 20) != 0) {
+		  status |= S_IDRT;
+		}		
+	      }
+	    else {
+	      status &= ~S_ITRK;
+	      status |= S_IDRT;
+	    }
+	    
+	    index_entry_set_status (index, ep->d_name, status);
+	  }
+	
+	if (st_buf.st_mode & S_IFDIR)
+	  {
+	    status = index_entry_get_status (index, ep->d_name);
+	    status |= S_IPST;	    	    	    
+	    	    
+	    if(tree_get_branch_entry (&tree, ep->d_name, &branch) == 0)
+	      {
+		state_t nur = STATE_INITIALIZER;
+
+		if (ur_check (npath) != 0) {
+		  status |= S_IDRT;
+		  status &= ~S_ITRK;
+		}
+		
+		else if (state_init (&nur, npath) == 0) 
+		  {
+		    branchname = branch_get_head_name (ur);
+		    //printf ("branchname : %s\n", branchname);
+		    if (branchname == NULL) goto error;
+		    if (branch_read_commit_sha1(&nur, sha1, branchname) != 0) goto error;
+		    
+		    if (strcmp (branch.branch, branchname) != 0 ||
+			memcmp (branch.commit, sha1, 20) != 0) {
+		      status |= S_IDRT;      
+		    }
+		    free (branchname); branchname = NULL;		    
+		}
+	      }	    
+	    else {
+	      status &= ~S_ITRK;
+	      status |= S_IDRT;
+	    }
+	    
+	    index_entry_set_status (index, ep->d_name, status);
+	  }
+
+	free (npath); npath = NULL;
+      }	    
+  }
+  (void) closedir (dp);
+    
+  index_write (ur, index);
+  tree_destroy (&tree);
+
+  return 0;
+
+ error:
+  tree_destroy (&tree);
+  commit_destroy (&commit);
+  if (branchname != NULL) free (branchname);
+  if (npath != NULL) free (npath);
+
+  return -1;
+}
+
 
 int
 index_read (state_t *ur, struct index *index)
@@ -159,7 +338,6 @@ index_entry_set (struct index *index, char *name, int status, time_t ctime)
   entry->status = status;
   entry->ctime = ctime;
 
-  ASSERT (entry->status & S_IPST);
   ASSERT (!(entry->status & S_ITRK) || entry->ctime > 0);
   ASSERT (!entry->ctime > 0 || entry->status & S_ITRK);
 
@@ -196,7 +374,6 @@ index_entry_get_status (struct index *index, char *name)
     }
   
   if (entry != NULL) {
-    ASSERT (entry->status & S_IPST);
     ASSERT (!(entry->status & S_ITRK) || entry->ctime > 0);
     ASSERT (!entry->ctime > 0 || entry->status & S_ITRK);
     return entry->status;
@@ -227,7 +404,6 @@ index_entry_get_ctime (struct index *index, char *name)
     }
   
   if (entry != NULL) {
-    ASSERT (entry->status & S_IPST);
     ASSERT (!(entry->status & S_ITRK) || entry->ctime > 0);
     ASSERT (!entry->ctime > 0 || entry->status & S_ITRK);
     return entry->ctime;
@@ -258,14 +434,12 @@ index_entry_set_status (struct index *index, char *name, int status)
   
   if (entry != NULL) {
     entry->status = status;
-    ASSERT (entry->status & S_IPST);
     ASSERT (!(entry->status & S_ITRK) || entry->ctime > 0);
     ASSERT (!entry->ctime > 0 || entry->status & S_ITRK);
     index->dirty = true;
     return 0;
   }
 
-  ASSERT (status & S_IPST);
   ASSERT (!(status & S_ITRK));
   return index_entry_set (index, name, status, 0);
 
@@ -300,7 +474,7 @@ index_entry_set_ctime (struct index *index, char *name, time_t ctime)
     return 0;
   }
 
-  return index_entry_set (index, name, S_IPST | S_ITRK, ctime);
+  return index_entry_set (index, name, S_ITRK, ctime);
 
  error:
   return -1;  
@@ -357,6 +531,28 @@ index_destroy (struct index *index)
   
   index->dirty = false;
   index->alive = false;
+  *index = INDEX_INITIALIZER;
 
   return 0;
+}
+
+
+static int 
+clear_present (struct index *index)
+{
+  struct list_elem *e;
+
+  if (!index->alive) goto error;
+
+  for (e = list_begin (&index->entries); e != list_end (&index->entries);
+       e = list_next (e))
+    {
+      struct index_entry *en = list_entry (e, struct index_entry, elem);
+      en->status &= ~S_IPST;
+    }
+  
+  return 0;
+
+ error:
+  return -1;  
 }

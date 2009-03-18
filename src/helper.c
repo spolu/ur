@@ -74,6 +74,8 @@ file_open (const char *root, const char *path, int oflag)
 
   sprintf (file, "%s/%s", root, path);
   
+  //printf ("FILE: %s\n", file);
+
   if ((fd = open (file, oflag)) < 0) goto error;
   
   free (file);

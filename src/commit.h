@@ -15,7 +15,7 @@
 
 struct commit 
 {
-  time_t date;
+  time_t ctime;
   unsigned char parent_sha1_1[20];
   unsigned char parent_sha1_2[20];
   
@@ -60,5 +60,7 @@ int commit_create (struct commit *commit,
  * destroy internall commit data
  */
 int commit_destroy (struct commit *commit);
+
+
 
 #endif

@@ -27,7 +27,7 @@ commit_objectify (state_t *ur, struct commit *commit, unsigned char sha1[20])
 
   if ((od = object_create (ur)) < 0) goto error;
 
-  ct = ctime (&commit->date);
+  ct = ctime (&commit->ctime);
   writeline (od, ct, strlen (ct) - 1, "\n");
   sha1_to_hex (commit->parent_sha1_1, buf);
   writeline (od, buf, strlen (buf), "\n");
@@ -65,7 +65,7 @@ commit_read (state_t *ur, struct commit *commit, const unsigned char sha1[20])
   buf = readline (fd);  
   if (buf == NULL) goto error;
   cp = strptime (buf, "%a %b %d %T %Y", &tm);
-  commit->date = mktime (&tm);
+  commit->ctime = mktime (&tm);
   free (buf); buf = NULL;
 
   buf = readline (fd);  
@@ -134,7 +134,7 @@ int commit_create (struct commit *commit,
   
   strncpy (commit->msg, msg, strlen (msg) + 1);
 
-  commit->date = time (NULL);  
+  commit->ctime = time (NULL);  
   commit->alive = true;
 
   return 0;
@@ -153,7 +153,8 @@ commit_destroy (struct commit *commit)
     if (commit->msg != NULL) free (commit->msg);
   }
   commit->alive = false;
-  
+  *commit = COMMIT_INITIALIZER;
+
   return 0;
 }
 
