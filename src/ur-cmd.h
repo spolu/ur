@@ -8,5 +8,6 @@ void output (const char *fmt, ...);
 
 int cmd_add (const char *path, bool recursive);
 int cmd_status (const char *path, bool recursive);
+int cmd_commit (const char *path, bool recursive, bool all, char *msg);
 
 #endif

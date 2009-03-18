@@ -239,8 +239,10 @@ cmd_status (const char *path, bool recursive)
       index_destroy (&index);
       state_destroy (&ur);    
     }
-  else
-    fail ("%s not initialized\n", path);
+  else {
+    printf ("*** %s \n    (not initialized)\n", path);
+    return 0;
+  }
 
   /*
    * recursion
@@ -272,6 +274,122 @@ cmd_status (const char *path, bool recursive)
       else
 	fail ("could not open directory %s", path);      
     }  
+
+  return 0;
+}
+
+
+int 
+cmd_commit (const char *path, bool recursive, bool all, char *msg)
+{
+  state_t ur = STATE_INITIALIZER;
+  struct index index = INDEX_INITIALIZER; 
+  struct stat64 st_buf;
+  DIR *dp;
+  struct dirent *ep;
+  struct list_elem *e;
+  char *branchname = NULL;
+
+  /*
+   * TODO:
+   * update index
+   * get old tree
+   * create commits for new files updating old tree
+   * commit new tree
+   * if needed: recurse
+   */
+  
+  if (lstat64 (path, &st_buf) != 0) fail("%s does not exist", path);
+  ASSERT (st_buf.st_mode & S_IFDIR);
+
+  /*
+   * recursion [FIRST HERE]
+   */
+  if (recursive) 
+    {      
+      dp = opendir (path);
+      if (dp != NULL)
+	{
+	  while ((ep = readdir (dp))) {
+	    if (ep->d_name[0] != '.') 
+	      {		
+		char *npath;
+		npath = (char *) malloc (strlen (path) +
+					 strlen (ep->d_name) + 2);
+		if (path[strlen (path) -1] == '/')
+		  sprintf (npath, "%s%s", path, ep->d_name);
+		else
+		  sprintf (npath, "%s/%s", path, ep->d_name);
+
+		if (lstat64 (npath, &st_buf) != 0) fail("%s does not exist", npath);
+		if (st_buf.st_mode & S_IFDIR)
+		  cmd_commit (npath, recursive, all, msg);
+		free (npath);
+	      }	    
+	  }
+	  (void) closedir (dp);
+	}
+      else
+	fail ("could not open directory %s", path);      
+    }  
+
+  if (ur_check (path) == 0) 
+    {      
+      if (state_init (&ur, path) != 0) fail ("fail reading state of %s", path);
+      if (index_read (&ur, &index) != 0) fail ("fail reading index of %s", path);
+
+      index_update (&ur, &index);
+
+      branchname = branch_get_head_name (&ur);
+      printf ("*** %s \n    (branch: %s)\n", ur.path, branchname);
+      free (branchname); branchname = NULL;
+
+      // reading added dirty files
+      for (e = list_begin (&index.entries); e != list_end (&index.entries);
+	   e = list_next (e))
+	{
+	  struct index_entry *en = list_entry (e, struct index_entry, elem);	
+	  if ((en->status & S_IPST) &&
+	      (en->status & S_IADD) && 
+	      (en->status & S_IDRT)) {
+	    printf ("#  added     : %s/%s\n", path, en->name);
+	  }
+	}
+
+      // reading dirty but not added
+      for (e = list_begin (&index.entries); e != list_end (&index.entries);
+	   e = list_next (e))
+	{
+	  struct index_entry *en = list_entry (e, struct index_entry, elem);	
+	  if ((en->status & S_IPST) &&
+	      !(en->status & S_IADD) && 
+	      (en->status & S_IDRT) && 
+	      (en->status & S_ITRK)) {
+	    printf ("#  dirty     : %s/%s\n", path, en->name);
+	  }
+	}
+
+      // reading untracked files
+      for (e = list_begin (&index.entries); e != list_end (&index.entries);
+	   e = list_next (e))
+	{
+	  struct index_entry *en = list_entry (e, struct index_entry, elem);	
+	  if ((en->status & S_IPST) &&
+	      !(en->status & S_ITRK) && 
+	      !(en->status & S_IADD)) {
+	    printf ("#  untracked : %s/%s\n", path, en->name);
+	  }
+	}
+      
+      index_destroy (&index);
+      state_destroy (&ur);    
+    }
+  else
+    return 0;  
+
+
+  return 0;
+  
 
   return 0;
 }
