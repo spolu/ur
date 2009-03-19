@@ -166,7 +166,7 @@ index_update (state_t *ur, struct index *index)
 		else if (state_init (&nur, npath) == 0) 
 		  {
 		    branchname = branch_get_head_name (&nur);
-		    printf ("branchname : %s\n", branchname);
+		    //printf ("branchname : %s\n", branchname);
 		    if (branchname == NULL) goto error;
 		    if (branch_read_commit_sha1(&nur, sha1, branchname) != 0) goto error;
 		    
