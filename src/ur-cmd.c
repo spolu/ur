@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <fcntl.h>
 
 #include "ur-cmd.h"
 #include "helper.h"
@@ -13,6 +14,9 @@
 #include "debug.h"
 #include "branch.h"
 #include "blob.h"
+#include "commit.h"
+#include "sha1.h"
+#include "io.h"
 
 void
 fail (const char *fmt, ...) 
@@ -287,21 +291,20 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
   struct index index = INDEX_INITIALIZER; 
   struct tree tree = TREE_INITIALIZER;
   struct tree ptree = TREE_INITIALIZER;
+  struct commit commit = COMMIT_INITIALIZER;
   struct stat64 st_buf;
   DIR *dp;
   struct dirent *ep;
   struct list_elem *e;
-  char *branchname = NULL;
+  char *branchname = NULL, *npath = NULL;
+  unsigned char sha1[20];
+  unsigned char psha1[20];
+  char buf[50];
+  unsigned char null_sha1[20];
+  int fd = -1, status;
 
-  /*
-   * TODO:
-   * update index
-   * get old tree
-   * create commits for new files updating old tree
-   * commit new tree
-   * if needed: recurse
-   */
-  
+  memset (null_sha1, 0, 20);
+
   if (lstat64 (path, &st_buf) != 0) fail("%s does not exist", path);
   ASSERT (st_buf.st_mode & S_IFDIR);
 
@@ -316,7 +319,6 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
 	  while ((ep = readdir (dp))) {
 	    if (ep->d_name[0] != '.') 
 	      {		
-		char *npath;
 		npath = (char *) malloc (strlen (path) +
 					 strlen (ep->d_name) + 2);
 		if (path[strlen (path) -1] == '/')
@@ -327,7 +329,7 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
 		if (lstat64 (npath, &st_buf) != 0) fail("%s does not exist", npath);
 		if (st_buf.st_mode & S_IFDIR)
 		  cmd_commit (npath, recursive, all, msg);
-		free (npath);
+		free (npath); npath = NULL;
 	      }	    
 	  }
 	  (void) closedir (dp);
@@ -347,42 +349,16 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
       printf ("*** %s \n    (branch: %s)\n", ur.path, branchname);
 
        // we start by setting the tree to its parent state
-      if (branch_read_tree (ur, &tree, branchname) != 0)
+      if (branch_read_tree (&ur, &tree, branchname) != 0)
 	fail ("could not read tree for %s (branch: %s)", ur.path, branchname);
 
       // keeps the parent tree around
-      if (branch_read_tree (ur, &ptree, branchname) != 0)
+      if (branch_read_tree (&ur, &ptree, branchname) != 0)
 	fail ("could not read tree for %s (branch: %s)", ur.path, branchname);
-      free (branchname); branchname = NULL;
 
-      // commiting added dirty files / branch
-      for (e = list_begin (&index.entries); e != list_end (&index.entries);
-	   e = list_next (e))
-	{
-	  struct index_entry *en = list_entry (e, struct index_entry, elem);	
-	  if ((en->status & S_IPST) &&
-	      (en->status & S_IADD) && 
-	      (en->status & S_IDRT)) {
-	    printf ("#  added     : %s/%s\n", path, en->name);	    
-	    // commit this file/branch
-	  }
-	}
+      if (branch_read_commit_sha1 (&ur, psha1, branchname) != 0)
+	fail ("could not read branch commit for %s (branch: %s)", ur.path, branchname);
 
-      // commiting dirty but not added file if all
-      for (e = list_begin (&index.entries); e != list_end (&index.entries);
-	   e = list_next (e))
-	{
-	  struct index_entry *en = list_entry (e, struct index_entry, elem);	
-	  if ((en->status & S_IPST) &&
-	      !(en->status & S_IADD) && 
-	      (en->status & S_IDRT) && 
-	      (en->status & S_ITRK)) {
-	    if (all) {
-	      printf ("#  dirty     : %s/%s\n", path, en->name);
-	      // commit this file/branch
-	    }
-	  }
-	}
 
       // removing non present / untracked files / branch 
       for (e = list_begin (&index.entries); e != list_end (&index.entries);
@@ -393,10 +369,117 @@ cmd_commit (const char *path, bool recursive, bool all, char *msg)
 	      ((en->status & S_IPST) &&
 	       !(en->status & S_ITRK) && 
 	       !(en->status & S_IADD))) {
+	    printf ("removing : %s\n", en->name);
 	    tree_entry_remove (&tree, en->name);
 	  }
 	}
+
+
+      // commiting added dirty files / branch
+      for (e = list_begin (&index.entries); e != list_end (&index.entries);
+	   e = list_next (e))
+	{
+	  struct index_entry *en = list_entry (e, struct index_entry, elem);	
+	  if ((en->status & S_IPST) &&
+	      (en->status & S_IADD) && 
+	      (en->status & S_IDRT)) 
+	    {
+	      char *npath;
+	      npath = (char *) malloc (strlen (path) +
+				       strlen (en->name) + 2);
+	      if (path[strlen (path) -1] == '/')
+		sprintf (npath, "%s%s", path, en->name);
+	      else
+		sprintf (npath, "%s/%s", path, en->name);
+	      
+	      if (lstat64 (npath, &st_buf) != 0) fail("%s does not exist", npath);
+	      if (st_buf.st_mode & S_IFDIR) {
+		if (commit_branch_using_tree (&ur, &tree, en->name) != 0)
+		  fail ("%s commit failed", npath);		  
+	      }
+	      if (st_buf.st_mode & S_IFREG) {
+		if (commit_blob_using_tree (&ur, &tree, en->name, &ptree, msg) != 0)
+		  fail ("%s commit failed", npath);
+	      }
+
+	      status = index_entry_get_status (&index, en->name);
+	      status &= ~S_IADD;
+	      index_entry_set_status (&index, en->name, status);
+	      
+	      printf ("commit: %s\n", npath);
+	      free (npath); npath = NULL;
+	  }
+	}
+
+      // commiting dirty but not added file if all
+      if (all) 
+	{
+	  for (e = list_begin (&index.entries); e != list_end (&index.entries);
+	       e = list_next (e))
+	    {
+	      struct index_entry *en = list_entry (e, struct index_entry, elem);	
+	      if ((en->status & S_IPST) &&
+		  !(en->status & S_IADD) && 
+		  (en->status & S_IDRT) && 
+		  (en->status & S_ITRK)) 
+		{
+		  npath = (char *) malloc (strlen (path) +
+					   strlen (en->name) + 2);
+		  if (path[strlen (path) -1] == '/')
+		    sprintf (npath, "%s%s", path, en->name);
+		  else
+		    sprintf (npath, "%s/%s", path, en->name);
+		  
+		  if (lstat64 (npath, &st_buf) != 0) fail("%s does not exist", npath);
+		  if (st_buf.st_mode & S_IFDIR) {
+		    if (commit_branch_using_tree (&ur, &tree, en->name) != 0)
+		      fail ("%s commit failed", npath);		  
+		  }
+		  if (st_buf.st_mode & S_IFREG) {
+		    if (commit_blob_using_tree (&ur, &tree, en->name, &ptree, msg) != 0)
+		      fail ("%s commit failed", npath);
+		  }
+		  
+		  status = index_entry_get_status (&index, en->name);
+		  status &= ~S_IADD;
+		  index_entry_set_status (&index, en->name, status);
+		  
+		  printf ("commit: %s\n", npath);
+		  free (npath);
+		}
+	    }
+	}
       
+      // we're ready to objectify and commit the new tree
+      if (tree_objectify (&ur, &tree, sha1) != 0)
+	fail ("fail to write new tree for %s", path);
+      
+      if (commit_create (&commit, psha1, null_sha1, TREE_TYPE, sha1, msg) != 0)
+	fail ("fail to generate new commit for %s", path);
+      
+      if (commit_objectify (&ur, &commit, sha1) != 0)
+	fail ("fail to write commit for %s", path);
+
+      npath = (char *) malloc (strlen (UR_DIR_HEADS) +
+			       strlen (branchname) + 2);
+      sprintf (npath, "%s/%s", UR_DIR_HEADS, branchname);
+      
+      if ((fd = file_open (path, npath, O_WRONLY | O_TRUNC | O_CREAT)) < 0)
+	fail ("fail to open branch %s", branchname);
+      sha1_to_hex (sha1, buf);
+      writeline (fd, buf, 40, "\n");
+      close (fd);
+
+      // finally we update the index
+      if (index_update (&ur, &index) != 0)
+	fail ("fail to update index for %s", ur.path);
+      if (index_write (&ur, &index) != 0)
+	fail ("fail to write index for %s", ur.path);
+
+
+      free (npath); npath = NULL;
+      free (branchname); branchname = NULL;
+      commit_destroy (&commit);
       tree_destroy (&tree);
       index_destroy (&index);
       state_destroy (&ur);    

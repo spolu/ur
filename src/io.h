@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-size_t readn (int fd, void *vptr, size_t n);
+ssize_t readn (int fd, void *vptr, size_t n);
 size_t writen (int fd, const void *vptr, size_t n);
 char * readline (int fd);
 size_t writeline (int fd, const char *ptr, size_t n, char * ret);

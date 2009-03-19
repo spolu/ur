@@ -132,48 +132,37 @@ object_finalize (state_t *ur, int fd, unsigned char sha1[20])
       }
     }
   
-  if (entry == NULL)
-    goto error;
-
+  if (entry == NULL) goto error;
   list_remove (&entry->elem);
   
   tmp_path = (char *) malloc (strlen (ur->path) + 
 			      strlen (UR_DIR) + 
 			      strlen ("obj_tmp-") + 40);
-  if (tmp_path == NULL)
-    goto error;
-  
-  sprintf (tmp_path, "%s/%s/obj_tmp-%d", ur->path, UR_DIR, entry->objd);
-  
-  free (entry);
-  entry = NULL;
+  if (tmp_path == NULL) goto error;  
+  sprintf (tmp_path, "%s/%s/obj_tmp-%d", ur->path, UR_DIR, entry->objd);  
+  free (entry); entry = NULL;
 
-  if ((fd = open (tmp_path, O_RDONLY)) < 0)
-    goto error;
-  
-  ur_SHA1_Init (&ctx);
-  
+  if ((fd = open (tmp_path, O_RDONLY)) < 0) goto error;  
+  ur_SHA1_Init (&ctx);  
   while ((len = readn (fd, buf, 512)) > 0) {
     ur_SHA1_Update (&ctx, buf, len);
   }
-
   close (fd);
 
-  ur_SHA1_Final (sha1, &ctx);
-  
+  ur_SHA1_Final (sha1, &ctx);  
   obj_path = (char *) malloc (strlen (ur->path) +
 			      strlen (UR_DIR_OBJECTS) + 50);
   if (obj_path == NULL)
     goto error;
-
   sha1_to_hex (sha1, hex);
   sprintf (obj_path, "%s/%s/%s", ur->path, UR_DIR_OBJECTS, hex);
   
-  if (link (tmp_path, obj_path) != 0)
-    goto error;
-
-  if (unlink (tmp_path) != 0)
-    goto error;
+  if (link (tmp_path, obj_path) != 0) {
+    unlink (obj_path);
+    if (link (tmp_path, obj_path) != 0) goto error;    
+  }
+  
+  if (unlink (tmp_path) != 0) goto error;
 
   free (tmp_path);
   free (obj_path);

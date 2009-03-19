@@ -1,11 +1,17 @@
 #ifndef _UR_BLOB_H
 #define _UR_BLOB_H
 
+struct tree;
 
 /*
- * Creates a new object for blob designed by a the file descriptor.
+ * initializes blob module
  */
-int blob_objectify (int fd, unsigned char sha1[20]);
+int init_blob ();
+
+/*
+ * creates a new object for blob designed by a the file descriptor.
+ */
+int blob_objectify (state_t *ur, int fd, unsigned char sha1[20]);
 
 /*
  * commits blob represented by name
@@ -15,7 +21,8 @@ int blob_objectify (int fd, unsigned char sha1[20]);
 int commit_blob_using_tree (state_t *ur, 
 			    struct tree *tree, 
 			    char *name,
-			    struct tree *ptree);
+			    struct tree *ptree,
+			    char *msg);
 
 
 #endif

@@ -15,7 +15,7 @@ int
 branch_read_commit_sha1 (state_t *ur, unsigned char sha1[20], const char *branchname)
 {
   int fd = -1;
-  struct commit head_commit = COMMIT_INITIALIZER;
+  //struct commit head_commit = COMMIT_INITIALIZER;
   char *head = NULL, *buf = NULL;
 
   head = (char *) malloc (strlen (branchname) + strlen (UR_DIR_HEADS) + 2);
@@ -31,9 +31,9 @@ branch_read_commit_sha1 (state_t *ur, unsigned char sha1[20], const char *branch
   free (buf); buf = NULL;
   close (fd);
   
-  if (commit_read (ur, &head_commit, sha1) < 0) goto error;
-  memcpy (sha1, head_commit.object_sha1, 20);
-  commit_destroy (&head_commit);
+  //if (commit_read (ur, &head_commit, sha1) < 0) goto error;
+  //memcpy (sha1, head_commit.object_sha1, 20);
+  //commit_destroy (&head_commit);
 
   return 0;
 
@@ -130,10 +130,11 @@ commit_branch_using_tree (state_t *ur,
   branch = branch_get_head_name (&b_ur);
   if (branch == NULL) goto error;
   if (branch_read_commit_sha1 (&b_ur, commit, branch) != 0) goto error;
-  free (branch); branch = NULL;
   state_destroy (&b_ur);
     
   if (tree_branch_entry_add (tree, name, branch, commit) != 0) goto error;
+
+  free (branch); branch = NULL;
 
   return 0;
 
@@ -141,7 +142,6 @@ commit_branch_using_tree (state_t *ur,
   if (branch != NULL) free (branch);
   if (path != NULL) free (path);
   state_destroy (&b_ur);
-  tree_destroy (&b_tree);
   return -1;
 }
 			  

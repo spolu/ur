@@ -33,11 +33,14 @@ init_index ()
 int 
 index_update (state_t *ur, struct index *index)
 {
-  char *branchname = NULL, *npath = NULL, *buf = NULL;
+  char *branchname = NULL, *npath = NULL;
+  char buf[512];
   struct tree tree = TREE_INITIALIZER;
   struct commit commit = COMMIT_INITIALIZER;
+  state_t nur = STATE_INITIALIZER;
   struct list_elem *e;
   unsigned char sha1[20], nsha1[20];
+  unsigned char branch_sha1[20];
   int status, fd = -1;
   time_t ctime;
   struct stat64 st_buf;
@@ -46,13 +49,14 @@ index_update (state_t *ur, struct index *index)
   struct blob_tree_entry blob;
   struct branch_tree_entry branch;
   ur_SHA_CTX ctx;
-  size_t len;
+  ssize_t len;
 
   if (!index->alive) goto error;
   
   branchname = branch_get_head_name (ur);
   if (branchname == NULL) goto error;
   if (branch_read_tree (ur, &tree, branchname) != 0) goto error;
+  if (branch_read_commit_sha1 (ur, branch_sha1, branchname) != 0) goto error;
   free (branchname); branchname = NULL;
 
   for (e = list_begin (&tree.blob_entries); e != list_end (&tree.blob_entries);
@@ -74,13 +78,14 @@ index_update (state_t *ur, struct index *index)
   for (e = list_begin (&tree.branch_entries); e != list_end (&tree.branch_entries);
        e = list_next (e))
     {
+      char buf[512];
       struct branch_tree_entry *en = list_entry (e, struct branch_tree_entry, elem);
 
       status = index_entry_get_status (index, en->name);
       status |= S_ITRK;
       
-      memcpy (sha1, en->commit, 20);      
-      if (commit_read (ur, &commit, sha1) != 0) goto error;
+      sha1_to_hex (branch_sha1, buf);
+      if (commit_read (ur, &commit, branch_sha1) != 0) goto error;
       ctime = commit.ctime;
       commit_destroy (&commit);
       
@@ -118,24 +123,25 @@ index_update (state_t *ur, struct index *index)
 		
 	    if(tree_get_blob_entry (&tree, ep->d_name, &blob) == 0)
 	      {
-		printf ("COMPUTING SHA1\n");
 		memcpy (sha1, blob.commit, 20);
 		if (commit_read (ur, &commit, sha1) != 0) goto error;
 		memcpy (sha1, commit.object_sha1, 20);
 		commit_destroy (&commit);
 		
-		if ((fd = open (npath, O_RDONLY)) < 0)
+		if ((fd = open (npath, O_RDWR)) < 0)
 		  goto error;		
 		ur_SHA1_Init (&ctx);		
 		while ((len = readn (fd, buf, 512)) > 0) {
 		  ur_SHA1_Update (&ctx, buf, len);
 		}		
-		close (fd);		
+		close (fd);
 		ur_SHA1_Final (nsha1, &ctx);
 		
 		if (memcmp (nsha1, sha1, 20) != 0) {
 		  status |= S_IDRT;
-		}		
+		}	
+		else
+		  status &= ~S_IDRT;
 	      }
 	    else {
 	      status &= ~S_ITRK;
@@ -152,8 +158,6 @@ index_update (state_t *ur, struct index *index)
 	    	    
 	    if(tree_get_branch_entry (&tree, ep->d_name, &branch) == 0)
 	      {
-		state_t nur = STATE_INITIALIZER;
-
 		if (ur_check (npath) != 0) {
 		  status |= S_IDRT;
 		  status &= ~S_ITRK;
@@ -161,8 +165,8 @@ index_update (state_t *ur, struct index *index)
 		
 		else if (state_init (&nur, npath) == 0) 
 		  {
-		    branchname = branch_get_head_name (ur);
-		    //printf ("branchname : %s\n", branchname);
+		    branchname = branch_get_head_name (&nur);
+		    printf ("branchname : %s\n", branchname);
 		    if (branchname == NULL) goto error;
 		    if (branch_read_commit_sha1(&nur, sha1, branchname) != 0) goto error;
 		    
@@ -170,7 +174,11 @@ index_update (state_t *ur, struct index *index)
 			memcmp (branch.commit, sha1, 20) != 0) {
 		      status |= S_IDRT;      
 		    }
+		    else {
+		      status &= ~S_IDRT;
+		    }
 		    free (branchname); branchname = NULL;		    
+		    state_destroy (&nur);
 		}
 	      }	    
 	    else {
@@ -194,6 +202,7 @@ index_update (state_t *ur, struct index *index)
  error:
   tree_destroy (&tree);
   commit_destroy (&commit);
+  state_destroy (&nur);
   if (branchname != NULL) free (branchname);
   if (npath != NULL) free (npath);
 

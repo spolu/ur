@@ -185,7 +185,6 @@ tree_destroy (struct tree *tree)
 	  list_remove (e);
 	  struct blob_tree_entry *en = list_entry (e, struct blob_tree_entry, elem);
 	  free (en->name);
-	  free (en->commit);
 	  free (en);
 	}
       

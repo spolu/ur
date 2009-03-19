@@ -11,7 +11,7 @@
 
 struct commit COMMIT_INITIALIZER;
 
-unsigned char null_sha1[20];
+static unsigned char null_sha1[20];
 
 int 
 init_commit ()
@@ -132,12 +132,16 @@ int commit_create (struct commit *commit,
 
   commit->object_type = object_type;
   memcpy (commit->object_sha1, object_sha1, 20);
-  commit->msg = (char *) malloc (strlen (msg) + 1);
-  
-  if (commit->msg == NULL) goto error;
-  
-  strncpy (commit->msg, msg, strlen (msg) + 1);
-
+  if (msg != NULL) {
+    commit->msg = (char *) malloc (strlen (msg) + 1);  
+    if (commit->msg == NULL) goto error;  
+    strncpy (commit->msg, msg, strlen (msg) + 1);
+  }
+  else {
+    commit->msg = (char *) malloc (strlen ("(empty)") + 1);
+    if (commit->msg == NULL) goto error;  
+    strncpy (commit->msg, "(empty)", strlen ("(empty)") + 1);
+  }
   commit->ctime = time (NULL);  
   commit->alive = true;
 
